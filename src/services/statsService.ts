@@ -1,5 +1,5 @@
 import { differenceInDays, parseISO, addDays, format, isAfter } from 'date-fns';
-import { CalendarEvent } from '../types';
+import type { CalendarEvent } from '../types';
 
 /**
  * Helper to group continuous period days into clusters (cycles)

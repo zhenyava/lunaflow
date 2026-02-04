@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Cloud, Heart, Star, ChevronRight, Lock, Smartphone, Database, Github } from 'lucide-react';
+import { Shield, Heart, Star, ChevronRight, Lock, Smartphone, Database, Github } from 'lucide-react';
 
 interface LandingPageProps {
   onStart: () => void;

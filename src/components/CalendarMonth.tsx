@@ -7,11 +7,10 @@ import {
   endOfWeek, 
   eachDayOfInterval, 
   isSameMonth, 
-  isSameDay,
   isToday
 } from 'date-fns';
-import { CalendarEvent, EventType } from '../types';
-import { PERIOD_COLOR, OVULATION_COLOR, PERIOD_LIGHT_COLOR, OVULATION_LIGHT_COLOR } from '../constants';
+import type { CalendarEvent } from '../types';
+import { PERIOD_COLOR, OVULATION_COLOR } from '../constants';
 
 interface CalendarMonthProps {
   month: Date;

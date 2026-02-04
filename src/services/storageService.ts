@@ -1,4 +1,4 @@
-import { CalendarEvent } from '../types';
+import type { CalendarEvent } from '../types';
 import { LOCAL_STORAGE_KEY } from '../constants';
 
 export const saveLocalEvents = (events: CalendarEvent[]) => {

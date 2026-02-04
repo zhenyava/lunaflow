@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth, endOfYear, max } from 'date-fns';
 import { Droplet, Sparkles, Cloud, CloudOff, RefreshCw, ChevronUp, ChevronLeft, ChevronRight, Activity, AlertCircle, MessageSquare, ThumbsUp, X, Plus, Lightbulb, Settings, Lock } from 'lucide-react';
-import { CalendarEvent, EventType, SyncState, GoogleToken, Wish } from './types';
+import type { CalendarEvent, EventType, SyncState, GoogleToken, Wish } from './types';
 import { getLocalEvents, saveLocalEvents, mergeEvents } from './services/storageService';
 import { 
   initializeGoogleApi, 
@@ -114,7 +114,7 @@ function App() {
                             localStorage.setItem(LAUNCHED_KEY, 'true');
                             setShowLanding(false);
                         })
-                        .catch(err => {
+                        .catch(() => {
                             handleLogout();
                         });
                 } else {

@@ -1,4 +1,4 @@
-import { Wish } from '../types';
+import type { Wish } from '../types';
 
 const LOCAL_WISHES_KEY = 'lunaflow_community_wishes';
 

@@ -1,4 +1,4 @@
-import { CalendarEvent, GoogleToken } from '../types';
+import type { CalendarEvent, GoogleToken } from '../types';
 import { APP_DATA_FILENAME, SCOPES } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
