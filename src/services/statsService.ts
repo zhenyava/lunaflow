@@ -66,12 +66,12 @@ export const calculateAverageCycleLength = (events: CalendarEvent[]): number | n
   return cycleCount > 0 ? Math.round(totalDays / cycleCount) : null;
 };
 
-export const calculateAverageDuration = (events: CalendarEvent[]): number => {
+export const calculateAverageDuration = (events: CalendarEvent[]): number | null => {
     const clusters = getPeriodClusters(events);
-    if (clusters.length === 0) return 5; // Default fallback
+    if (clusters.length === 0) return null;
 
     const totalDuration = clusters.reduce((acc, cluster) => acc + cluster.length, 0);
-    return Math.round(totalDuration / clusters.length) || 5;
+    return Math.round(totalDuration / clusters.length) || null;
 };
 
 /**
@@ -90,7 +90,7 @@ export const predictFuturePeriods = (
     if (clusters.length === 0) return predicted;
 
     // Get stats
-    const avgDuration = calculateAverageDuration(events);
+    const avgDuration = calculateAverageDuration(events) ?? 5;
     
     // Start from the last known period start date
     const lastCluster = clusters[clusters.length - 1];

@@ -12,7 +12,7 @@ import {
   revokeToken,
   restoreGapiSession
 } from './services/googleService';
-import { calculateAverageCycleLength, predictFuturePeriods } from './services/statsService';
+import { calculateAverageCycleLength, calculateAverageDuration, predictFuturePeriods } from './services/statsService';
 import { GOOGLE_CLIENT_ID, FOLDER_NAME } from './constants';
 import CalendarMonth from './components/CalendarMonth';
 import LandingPage from './components/LandingPage';
@@ -267,6 +267,7 @@ function App() {
 
   // Statistics & Predictions
   const avgCycleLength = useMemo(() => calculateAverageCycleLength(events), [events]);
+  const avgPeriodDuration = useMemo(() => calculateAverageDuration(events), [events]);
   
   // Calculate predictions. Ensure we cover the desktop view year even if it's far in future
   const predictedDates = useMemo(() => {
@@ -330,10 +331,18 @@ function App() {
                    <h1 className="text-2xl font-bold bg-gradient-to-r from-rose-500 to-violet-500 bg-clip-text text-transparent">
                      LunaFlow
                    </h1>
-                   {avgCycleLength && (
-                       <div className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-1 animate-in fade-in">
-                           <Activity size={12} className="text-rose-500"/>
-                           <span>Avg Cycle: <span className="text-slate-900 font-bold">{avgCycleLength}</span> days</span>
+                   {(avgCycleLength || avgPeriodDuration) && (
+                       <div className="text-xs text-slate-500 font-medium flex items-center gap-2 mt-1 animate-in fade-in">
+                           <div className="flex items-center gap-1">
+                               <Activity size={12} className="text-rose-500"/>
+                               {avgCycleLength && (
+                                   <span>Cycle: <span className="text-slate-900 font-bold">{avgCycleLength}</span> days</span>
+                               )}
+                               {avgCycleLength && avgPeriodDuration && <span className="text-slate-300">•</span>}
+                               {avgPeriodDuration && (
+                                   <span>Period: <span className="text-slate-900 font-bold">{avgPeriodDuration}</span> days</span>
+                               )}
+                           </div>
                        </div>
                    )}
                </div>
