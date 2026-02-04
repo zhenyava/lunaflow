@@ -91,7 +91,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   return (
     <div className={`w-full ${isDesktop ? 'flex flex-col h-full justify-between' : ''} ${className}`}>
       <h3 className={`font-semibold text-slate-800 capitalize ${isDesktop ? 'text-sm lg:text-base mb-2 pl-1' : 'text-xl mb-4 pl-2'}`}>
-        {format(month, 'MMMM')} <span className={isDesktop ? "hidden 2xl:inline" : "md:hidden inline"}>{format(month, 'yyyy')}</span>
+        {format(month, 'MMMM')}
       </h3>
       
       {/* Weekday Headers */}
