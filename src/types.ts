@@ -23,11 +23,3 @@ export interface GoogleToken {
   token_type: string;
   expires_at?: number; // Calculated expiration timestamp
 }
-
-export interface Wish {
-  id: string;
-  text: string;
-  votes: number;
-  status: 'pending' | 'approved' | 'rejected';
-  createdAt: number;
-}

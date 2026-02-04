@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth, endOfYear, max } from 'date-fns';
-import { Droplet, Sparkles, Cloud, CloudOff, RefreshCw, ChevronUp, ChevronLeft, ChevronRight, Activity, AlertCircle, MessageSquare, ThumbsUp, X, Plus, Lightbulb, Settings, Lock } from 'lucide-react';
-import type { CalendarEvent, EventType, SyncState, GoogleToken, Wish } from './types';
+import { Droplet, Sparkles, Cloud, CloudOff, RefreshCw, ChevronUp, ChevronLeft, ChevronRight, Activity, AlertCircle, MessageSquare, X, Settings } from 'lucide-react';
+import type { CalendarEvent, EventType, SyncState, GoogleToken } from './types';
 import { getLocalEvents, saveLocalEvents, mergeEvents } from './services/storageService';
 import { 
   initializeGoogleApi, 
@@ -13,7 +13,6 @@ import {
   restoreGapiSession
 } from './services/googleService';
 import { calculateAverageCycleLength, predictFuturePeriods } from './services/statsService';
-import { fetchWishes, submitWish, voteWish, STORAGE_BIN_ID, STORAGE_API_KEY } from './services/wishService';
 import { GOOGLE_CLIENT_ID } from './constants';
 import CalendarMonth from './components/CalendarMonth';
 import LandingPage from './components/LandingPage';
@@ -42,17 +41,8 @@ function App() {
   const [configOpen, setConfigOpen] = useState(false);
   const [isApiInitialized, setIsApiInitialized] = useState(false);
   
-  // Wishlist State
-  const [wishesOpen, setWishesOpen] = useState(false);
-  const [wishes, setWishes] = useState<Wish[]>([]);
-  const [newWishText, setNewWishText] = useState('');
-  const [isLoadingWishes, setIsLoadingWishes] = useState(false);
-  const [isSubmittingWish, setIsSubmittingWish] = useState(false);
-  
   // Config State
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-  const [jsonBinId, setJsonBinId] = useState(() => localStorage.getItem(STORAGE_BIN_ID) || '');
-  const [jsonApiKey, setJsonApiKey] = useState(() => localStorage.getItem(STORAGE_API_KEY) || '');
 
   // Use Client ID from constants or fallback to local storage
   const [googleClientId, setGoogleClientId] = useState(() => {
@@ -256,50 +246,10 @@ function App() {
       localStorage.removeItem('LUNA_AUTH_TOKEN');
   };
 
-  const saveJsonBinConfig = () => {
-      localStorage.setItem(STORAGE_BIN_ID, jsonBinId);
-      localStorage.setItem(STORAGE_API_KEY, jsonApiKey);
-      alert("Cloud Community Config Saved!");
-  };
-
   const resetClientId = () => {
       if(confirm("Reset all settings?")) {
           localStorage.clear();
           window.location.reload();
-      }
-  };
-
-  const handleOpenWishes = () => {
-      setWishesOpen(true);
-      setConfigOpen(false);
-      setIsLoadingWishes(true);
-      fetchWishes().then(data => {
-          setWishes(data);
-          setIsLoadingWishes(false);
-      });
-  };
-
-  const handleSubmitWish = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newWishText.trim()) return;
-      
-      setIsSubmittingWish(true);
-      try {
-          const updated = await submitWish(newWishText);
-          setWishes(updated);
-          setNewWishText('');
-      } catch (e) {
-          alert("Failed to submit wish. Check internet or config.");
-      }
-      setIsSubmittingWish(false);
-  };
-
-  const handleVote = async (id: string) => {
-      try {
-        const updated = await voteWish(id);
-        setWishes(updated);
-      } catch (e) {
-          console.error("Vote failed", e);
       }
   };
 
@@ -455,17 +405,6 @@ function App() {
 
                  {/* Navigation Links */}
                  <div className="space-y-1 mb-3">
-                     <button 
-                         onClick={handleOpenWishes}
-                         className="flex w-full items-center gap-2 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-100 hover:shadow-sm transition-all group text-left"
-                     >
-                         <Lightbulb size={16} className="text-amber-500" />
-                         <div>
-                            <span className="block text-sm font-semibold text-amber-900">Vote on Features</span>
-                            <span className="text-[10px] text-amber-700">Community Wishlist</span>
-                         </div>
-                     </button>
-                     
                      <a 
                          href="mailto:support@lunaflow.app?subject=LunaFlow%20Feedback"
                          className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors group"
@@ -475,7 +414,7 @@ function App() {
                      </a>
                  </div>
 
-                 {/* Advanced / JSONBin Toggle */}
+                 {/* Advanced Toggle */}
                  <div className="border-t border-gray-100 pt-2">
                      <button 
                         onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
@@ -487,27 +426,6 @@ function App() {
 
                      {showAdvancedConfig && (
                          <div className="bg-slate-50 p-3 rounded text-xs space-y-2 animate-in slide-in-from-top-1">
-                             <p className="font-bold text-gray-600">Community Cloud Config (JSONBin)</p>
-                             <input 
-                                type="text" 
-                                placeholder="Bin ID (e.g. 64f...)" 
-                                value={jsonBinId}
-                                onChange={(e) => setJsonBinId(e.target.value)}
-                                className="w-full p-2 border rounded"
-                             />
-                             <div className="relative">
-                                <input 
-                                    type="password" 
-                                    placeholder="Master/Access Key (X-Master-Key)" 
-                                    value={jsonApiKey}
-                                    onChange={(e) => setJsonApiKey(e.target.value)}
-                                    className="w-full p-2 border rounded pr-8"
-                                />
-                                <Lock size={12} className="absolute right-2 top-3 text-gray-400"/>
-                             </div>
-                             <button onClick={saveJsonBinConfig} className="w-full bg-slate-800 text-white py-1 rounded">
-                                 Save Keys
-                             </button>
                              <button onClick={resetClientId} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
                                  Reset Application Data
                              </button>
@@ -610,83 +528,6 @@ function App() {
             </button>
          </div>
       </footer>
-
-      {/* Wishes Modal */}
-      {wishesOpen && (
-          <div className="absolute inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-              <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-200">
-                  <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                      <div>
-                          <h2 className="text-xl font-bold text-gray-800">Community Wishes</h2>
-                          <div className="flex items-center gap-1">
-                              <p className="text-xs text-gray-500">Vote on features you want to see next.</p>
-                              {jsonBinId && <span className="text-[10px] bg-blue-100 text-blue-600 px-1 rounded font-bold">LIVE</span>}
-                          </div>
-                      </div>
-                      <button onClick={() => setWishesOpen(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
-                          <X size={20} />
-                      </button>
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                      {isLoadingWishes ? (
-                          <div className="flex justify-center py-10 text-gray-400">
-                              <RefreshCw className="animate-spin mr-2" /> Loading...
-                          </div>
-                      ) : wishes.length === 0 ? (
-                          <div className="text-center py-10 text-gray-400">No wishes yet. Be the first!</div>
-                      ) : (
-                          wishes.map(wish => (
-                              <div key={wish.id} className="border border-gray-100 rounded-xl p-3 hover:bg-slate-50 transition-colors flex gap-3">
-                                  <div className="flex flex-col items-center gap-1 min-w-[3rem]">
-                                      <button 
-                                          onClick={() => handleVote(wish.id)}
-                                          className="flex flex-col items-center group"
-                                      >
-                                          <ThumbsUp size={18} className="text-gray-400 group-hover:text-rose-500 transition-colors" />
-                                          <span className="text-sm font-bold text-gray-700 group-hover:text-rose-600">{wish.votes}</span>
-                                      </button>
-                                  </div>
-                                  <div className="flex-1">
-                                      <p className="text-gray-800 font-medium text-sm">{wish.text}</p>
-                                      <div className="flex items-center gap-2 mt-2">
-                                          {wish.status === 'approved' && <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full uppercase">Planned</span>}
-                                          {wish.status === 'pending' && <span className="text-[10px] font-bold bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full uppercase">Under Review</span>}
-                                          <span className="text-[10px] text-gray-400">{new Date(wish.createdAt).toLocaleDateString()}</span>
-                                      </div>
-                                  </div>
-                              </div>
-                          ))
-                      )}
-                  </div>
-
-                  <div className="p-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-                      <form onSubmit={handleSubmitWish} className="flex gap-2">
-                          <input 
-                              type="text" 
-                              value={newWishText}
-                              onChange={(e) => setNewWishText(e.target.value)}
-                              placeholder="I wish for..."
-                              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none text-sm"
-                          />
-                          <button 
-                              type="submit" 
-                              disabled={isSubmittingWish || !newWishText.trim()}
-                              className="bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-colors"
-                          >
-                              {isSubmittingWish ? <RefreshCw className="animate-spin" size={16} /> : <Plus size={16} />}
-                              Add
-                          </button>
-                      </form>
-                      {!jsonBinId && (
-                         <p className="text-[10px] text-gray-400 mt-2 text-center">
-                             Runs in local demo mode. Add JSONBin keys in settings to go live.
-                         </p>
-                      )}
-                  </div>
-              </div>
-          </div>
-      )}
     </div>
   );
 }
