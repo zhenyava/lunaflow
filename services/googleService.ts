@@ -1,0 +1,239 @@
+import { CalendarEvent, GoogleToken } from '../types';
+import { APP_DATA_FILENAME, SCOPES } from '../constants';
+
+// Declare global types for GAPI and Google Identity Services
+declare global {
+  interface Window {
+    google: any;
+    gapi: any;
+  }
+}
+
+let tokenClient: any;
+let gapiInited = false;
+let gisInited = false;
+
+// Initialize the Google API Client
+export const initializeGoogleApi = (
+  clientId: string,
+  onInit: (success: boolean) => void
+) => {
+  if (!clientId) {
+    onInit(false);
+    return;
+  }
+
+  const initGapi = async () => {
+      try {
+        await window.gapi.client.init({
+            discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+        });
+        gapiInited = true;
+        checkDone();
+      } catch (e) {
+        console.error("Error initializing GAPI client", e);
+      }
+  };
+
+  const initGis = () => {
+      try {
+        tokenClient = window.google.accounts.oauth2.initTokenClient({
+            client_id: clientId,
+            scope: SCOPES,
+            callback: '', // defined at request time
+        });
+        gisInited = true;
+        checkDone();
+      } catch (e) {
+        console.error("Error initializing GIS client", e);
+      }
+  }
+
+  const checkDone = () => {
+      if (gapiInited && gisInited) onInit(true);
+  }
+
+  // Load GAPI script if not present
+  if (!document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
+      const script1 = document.createElement('script');
+      script1.src = "https://apis.google.com/js/api.js";
+      script1.onload = () => window.gapi.load('client', initGapi);
+      document.body.appendChild(script1);
+  } else if (window.gapi) {
+      // If script is loaded, ensure client is initialized
+      if (!gapiInited) window.gapi.load('client', initGapi);
+      else checkDone();
+  }
+
+  // Load GIS script if not present
+  if (!document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
+      const script2 = document.createElement('script');
+      script2.src = "https://accounts.google.com/gsi/client";
+      script2.onload = initGis;
+      document.body.appendChild(script2);
+  } else if (window.google && window.google.accounts) {
+      // If script is loaded, re-init token client with potentially new ID
+      initGis();
+  }
+};
+
+/**
+ * Manually sets the token in GAPI client.
+ * Used for restoring session from LocalStorage.
+ */
+export const restoreGapiSession = (token: GoogleToken) => {
+    if (window.gapi && window.gapi.client) {
+        window.gapi.client.setToken(token);
+    }
+};
+
+/**
+ * forceConsent: 
+ * - true: Shows the "Allow access" screen
+ * - false: Tries to get token (NOTE: In modern browsers this still opens a popup)
+ */
+export const signInToGoogle = async (forceConsent: boolean = true): Promise<GoogleToken> => {
+  return new Promise((resolve, reject) => {
+    if (!tokenClient) return reject('Google Identity Services not initialized');
+
+    tokenClient.callback = async (resp: any) => {
+      if (resp.error) {
+        reject(resp);
+      }
+      
+      // CRITICAL FIX: Connect the token from GIS to GAPI
+      // This is required for gapi.client.drive calls to work
+      if (window.gapi && window.gapi.client) {
+          window.gapi.client.setToken(resp);
+      }
+
+      resolve(resp as GoogleToken);
+    };
+
+    // 'consent' forces the screen, '' (empty) tries to skip it if already granted
+    tokenClient.requestAccessToken({ prompt: forceConsent ? 'consent' : '' });
+  });
+};
+
+/**
+ * Checks if the data file exists in Drive.
+ * If yes, returns the File ID.
+ * If no, creates an empty file and returns the new File ID.
+ */
+export const ensureDriveFileExists = async (): Promise<string> => {
+  try {
+    // Ensure we have a token before trying to list files
+    const token = window.gapi.client.getToken();
+    if (!token) {
+        throw new Error("No Google API token found. Please sign in.");
+    }
+
+    // 1. Check if file exists
+    const response = await window.gapi.client.drive.files.list({
+      spaces: 'appDataFolder',
+      fields: 'files(id, name)',
+      q: `name = '${APP_DATA_FILENAME}' and trashed = false`,
+      pageSize: 1
+    });
+
+    const files = response.result.files;
+    
+    if (files && files.length > 0) {
+      console.log('Found existing file:', files[0].id);
+      return files[0].id;
+    }
+
+    // 2. Create if doesn't exist
+    console.log('Creating new file...');
+    const metadata = {
+      name: APP_DATA_FILENAME,
+      parents: ['appDataFolder'],
+      mimeType: 'application/json'
+    };
+
+    // Initial content is empty array
+    const fileContent = JSON.stringify([]);
+    const file = new Blob([fileContent], { type: 'application/json' });
+
+    const accessToken = token.access_token;
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', file);
+
+    const createResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: {
+          'Authorization': `Bearer ${accessToken}`
+      },
+      body: form
+    });
+    
+    if (!createResponse.ok) {
+        throw new Error(`Failed to create file: ${createResponse.statusText}`);
+    }
+
+    const result = await createResponse.json();
+    return result.id;
+
+  } catch (error) {
+    console.error("Error ensuring drive file exists:", error);
+    throw error;
+  }
+};
+
+/**
+ * Uploads data to a specific File ID using PATCH
+ */
+export const uploadDriveData = async (fileId: string, events: CalendarEvent[]): Promise<void> => {
+  const token = window.gapi.client.getToken();
+  if (!token) throw new Error("No token for upload");
+
+  const fileContent = JSON.stringify(events);
+  const accessToken = token.access_token;
+  
+  try {
+    const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+      },
+      body: fileContent
+    });
+
+    if (!response.ok) {
+        if (response.status === 401) {
+             throw new Error("Unauthorized");
+        }
+        throw new Error(`Upload failed: ${response.statusText}`);
+    }
+  } catch (error) {
+    console.error("Drive Upload Error", error);
+    throw error;
+  }
+};
+
+export const fetchDriveDataContent = async (fileId: string): Promise<CalendarEvent[]> => {
+    try {
+        const fileResponse = await window.gapi.client.drive.files.get({
+            fileId: fileId,
+            alt: 'media'
+        });
+        return fileResponse.result as CalendarEvent[];
+    } catch (error) {
+        console.error("Fetch Content Error", error);
+        throw error;
+    }
+}
+
+export const revokeToken = () => {
+    try {
+        const token = window.gapi.client.getToken();
+        if (token) {
+            window.google.accounts.oauth2.revoke(token.access_token, () => {console.log('Revoked')});
+            window.gapi.client.setToken(null);
+        }
+    } catch(e) {
+        console.warn("Error revoking token", e);
+    }
+}
