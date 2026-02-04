@@ -1,73 +1,31 @@
-# React + TypeScript + Vite
+# LunaFlow
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A privacy-focused, client-side period cycle and ovulation tracker with optional Google Drive sync.
 
-Currently, two official plugins are available:
+## ✨ Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **🔒 Privacy First**: All data is stored locally on your device by default. No external database tracks you.
+- **☁️ Google Drive Sync**: Optional, secure backup to your own personal Google Drive (app-specific folder only - LunaFlow).
+- **📅 Cycle Tracking**: Easily log menstrual periods and ovulation days.
+- **🔮 Smart Predictions**: Automatic calculation of cycle averages and future period predictions based on your history.
+- **📱 Responsive Design**: "Infinite" vertical scroll for mobile and a comprehensive year-view for desktop.
 
-## React Compiler
+### Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. clone repository
+2. cal ```npm instal```
+3. call ```npm run dev```
+4. Open your browser at `http://localhost:5173`.
 
-## Expanding the ESLint configuration
+### (Optional) To enable the Google Drive Sync locally:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
+2. Enable the **Google Drive API**.
+3. Create OAuth 2.0 credentials (**Client ID** for Web Application).
+4. Add `http://localhost:5173` to "Authorized JavaScript origins".
+5. Create a `.env` file in the root directory:
+   ```env
+   VITE_GOOGLE_CLIENT_ID=your_client_id_here.apps.googleusercontent.com
+   ```
+   *Alternatively, you can enter the Client ID directly in the App Settings UI.*
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
