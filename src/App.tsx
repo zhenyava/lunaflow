@@ -13,7 +13,7 @@ import {
   restoreGapiSession
 } from './services/googleService';
 import { calculateAverageCycleLength, predictFuturePeriods } from './services/statsService';
-import { GOOGLE_CLIENT_ID } from './constants';
+import { GOOGLE_CLIENT_ID, FOLDER_NAME } from './constants';
 import CalendarMonth from './components/CalendarMonth';
 import LandingPage from './components/LandingPage';
 
@@ -375,7 +375,7 @@ function App() {
                          <Cloud size={16} className="text-blue-500"/>
                          <h3 className="font-medium text-gray-800">Google Backup</h3>
                      </div>
-                     <p className="text-xs text-gray-500 mb-3">Sync your data to a private folder in your Google Drive.</p>
+                     <p className="text-xs text-gray-500 mb-3">Sync your data to a folder named "{FOLDER_NAME}" in your Google Drive.</p>
                      
                      {!isAuthenticated ? (
                          <div className="space-y-2">

@@ -8,8 +8,9 @@ export const OVULATION_COLOR = 'bg-violet-500 text-white hover:bg-violet-600';
 export const OVULATION_LIGHT_COLOR = 'bg-violet-100 text-violet-700';
 
 // Google API Scopes
-// We use drive.appdata to store files in a hidden folder app-specific
-export const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
+// We use drive.file for visible folder access
+export const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+export const FOLDER_NAME = 'LunaFlow';
 
 /**
  * CLIENT ID CONFIGURATION

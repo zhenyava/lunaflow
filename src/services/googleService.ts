@@ -1,5 +1,5 @@
 import type { CalendarEvent, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, SCOPES } from '../constants';
+import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
 declare global {
@@ -119,6 +119,7 @@ export const signInToGoogle = async (forceConsent: boolean = true): Promise<Goog
  * Checks if the data file exists in Drive.
  * If yes, returns the File ID.
  * If no, creates an empty file and returns the new File ID.
+ * Now it uses a visible folder instead of appDataFolder.
  */
 export const ensureDriveFileExists = async (): Promise<string> => {
   try {
@@ -128,32 +129,57 @@ export const ensureDriveFileExists = async (): Promise<string> => {
         throw new Error("No Google API token found. Please sign in.");
     }
 
-    // 1. Check if file exists
-    const response = await window.gapi.client.drive.files.list({
-      spaces: 'appDataFolder',
+    // 1. Find or create the LunaFlow folder
+    let folderId = '';
+    const folderResponse = await window.gapi.client.drive.files.list({
+      q: `name = '${FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
       fields: 'files(id, name)',
-      q: `name = '${APP_DATA_FILENAME}' and trashed = false`,
+      spaces: 'drive'
+    });
+
+    const folders = folderResponse.result.files;
+    if (folders && folders.length > 0) {
+      folderId = folders[0].id;
+      console.log('Found existing folder:', folderId);
+    } else {
+      console.log('Creating new folder...');
+      const folderMetadata = {
+        name: FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder'
+      };
+      const createFolderResponse = await window.gapi.client.drive.files.create({
+        resource: folderMetadata,
+        fields: 'id'
+      });
+      folderId = createFolderResponse.result.id;
+      console.log('Created new folder:', folderId);
+    }
+
+    // 2. Check if file exists inside the folder
+    const response = await window.gapi.client.drive.files.list({
+      spaces: 'drive',
+      fields: 'files(id, name)',
+      q: `name = '${APP_DATA_FILENAME}' and '${folderId}' in parents and trashed = false`,
       pageSize: 1
     });
 
     const files = response.result.files;
     
     if (files && files.length > 0) {
-      console.log('Found existing file:', files[0].id);
+      console.log('Found existing file in visible folder:', files[0].id);
       return files[0].id;
     }
 
-    // 2. Create if doesn't exist
-    console.log('Creating new file...');
+    // 3. Create file in visible folder
+    console.log('Creating new file in visible folder...');
     const metadata = {
       name: APP_DATA_FILENAME,
-      parents: ['appDataFolder'],
+      parents: [folderId],
       mimeType: 'application/json'
     };
 
-    // Initial content is empty array
-    const fileContent = JSON.stringify([]);
-    const file = new Blob([fileContent], { type: 'application/json' });
+    const initialContent = JSON.stringify([]);
+    const file = new Blob([initialContent], { type: 'application/json' });
 
     const accessToken = token.access_token;
     const form = new FormData();
@@ -173,6 +199,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
     }
 
     const result = await createResponse.json();
+    console.log('File created and migrated if necessary:', result.id);
     return result.id;
 
   } catch (error) {
