@@ -32,7 +32,7 @@ const Feature = ({ icon: Icon, title, desc }: any) => (
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+    <div className="h-full overflow-y-auto bg-slate-50 flex flex-col font-sans">
       {/* Navigation */}
       <nav className="flex justify-between items-center p-6 max-w-6xl mx-auto w-full">
         <div className="text-2xl font-bold bg-gradient-to-r from-rose-500 to-violet-500 bg-clip-text text-transparent">
