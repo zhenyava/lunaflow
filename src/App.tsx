@@ -1,155 +1,17 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
-import { getLocalEvents } from './services/storageService';
-import LandingPage from './components/LandingPage';
-import Header from './components/Header';
-import MobileCalendarView from './components/MobileCalendarView';
-import DesktopCalendarView from './components/DesktopCalendarView';
-import MobileControls from './components/MobileControls';
-import { useCalendarEvents } from './hooks/useCalendarEvents';
-import { useGoogleSync } from './hooks/useGoogleSync';
-import { useCycleStats } from './hooks/useCycleStats';
-
-// Generate a range of months for the Mobile "Infinite" list
-const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
-const INITIAL_END_DATE = addMonths(startOfMonth(new Date()), 12);
-
-const LAUNCHED_KEY = 'lunaflow_has_launched';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import CalendarApp from './components/CalendarApp';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 function App() {
-  // Navigation State
-  const [showLanding, setShowLanding] = useState(true);
-  
-  // Mobile uses a long list of months
-  const [mobileMonths, setMobileMonths] = useState<Date[]>([]);
-  
-  // Desktop uses a single year view
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  
-  // Config State for UI (Settings Modal)
-  const [isSettingsOpen, setSettingsOpen] = useState(false);
-
-  // Custom Hooks
-  const { 
-    events, 
-    setEvents, 
-    activeType, 
-    setActiveType, 
-    handleDayClick 
-  } = useCalendarEvents();
-
-  const handleStartApp = () => {
-      localStorage.setItem(LAUNCHED_KEY, 'true');
-      setShowLanding(false);
-  };
-
-  const {
-    isAuthenticated,
-    syncState,
-    googleClientId,
-    setGoogleClientId,
-    handleGoogleLogin,
-    handleLogout,
-    performFullSync,
-    driveFileId
-  } = useGoogleSync({ 
-      events, 
-      setEvents,
-      onLoginSuccess: handleStartApp 
-  });
-
-  // Statistics & Predictions
-  const { avgCycleLength, avgPeriodDuration, predictedDates } = useCycleStats(events, currentYear);
-
-  // 1. Check for Landing Page / First Launch
-  useEffect(() => {
-      const hasLaunched = localStorage.getItem(LAUNCHED_KEY);
-      const localEvents = getLocalEvents();
-      // If user has data or explicitly launched before, skip landing
-      if (hasLaunched || localEvents.length > 0) {
-          setShowLanding(false);
-      }
-  }, []);
-
-  // 2. Setup Mobile Calendar
-  useEffect(() => {
-    const monthList = eachMonthOfInterval({ start: INITIAL_START_DATE, end: INITIAL_END_DATE });
-    setMobileMonths(monthList);
-  }, []);
-
-  // Desktop: Generate months for the selected year
-  const desktopMonths = useMemo(() => {
-      return eachMonthOfInterval({
-          start: new Date(currentYear, 0, 1),
-          end: new Date(currentYear, 11, 31)
-      });
-  }, [currentYear]);
-
-  const handlePrevYear = () => setCurrentYear(y => y - 1);
-  const handleNextYear = () => setCurrentYear(y => y + 1);
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    // Only scroll if NOT showing landing page
-    if (!showLanding && scrollRef.current) {
-        const currentMonthStart = startOfMonth(new Date());
-        const currentId = `${format(currentMonthStart, 'yyyy-MM-dd')}-header`;
-        const el = document.getElementById(currentId);
-        if (el) el.scrollIntoView({ block: 'center' });
-    }
-  }, [mobileMonths, showLanding]);
-
-
-  // Conditional Rendering
-  if (showLanding) {
-      return <LandingPage onStart={handleStartApp} />;
-  }
-
   return (
-    <div className="flex flex-col h-full bg-slate-50 relative">
-      <Header 
-        avgCycleLength={avgCycleLength}
-        avgPeriodDuration={avgPeriodDuration}
-        activeType={activeType}
-        setActiveType={setActiveType}
-        isAuthenticated={isAuthenticated}
-        syncState={syncState}
-        onSync={() => driveFileId && performFullSync(driveFileId)}
-        onLogin={handleGoogleLogin}
-        isSettingsOpen={isSettingsOpen}
-        setSettingsOpen={setSettingsOpen}
-        googleClientId={googleClientId}
-        setGoogleClientId={setGoogleClientId}
-        onLogout={handleLogout}
-      />
-
-      {/* Main Content Area */}
-      <main ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar scroll-smooth relative bg-white md:bg-slate-50">
-        
-        <MobileCalendarView 
-            months={mobileMonths}
-            events={events}
-            predictedDates={predictedDates}
-            onDayClick={handleDayClick}
-        />
-
-        <DesktopCalendarView 
-            currentYear={currentYear}
-            onPrevYear={handlePrevYear}
-            onNextYear={handleNextYear}
-            months={desktopMonths}
-            events={events}
-            predictedDates={predictedDates}
-            onDayClick={handleDayClick}
-        />
-      </main>
-
-      <MobileControls 
-        activeType={activeType}
-        setActiveType={setActiveType}
-      />
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<CalendarApp />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
