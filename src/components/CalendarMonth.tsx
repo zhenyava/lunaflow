@@ -21,6 +21,9 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         disableNavigation
         hideNavigation
         onDayClick={onDayClick}
+        modifiersClassNames={{
+          today: "rounded-full border-2 border-slate-900 font-bold aspect-square flex items-center justify-center",
+        }}
         classNames={{
           month_grid: "w-full table-fixed",
           day: "w-full h-full",
