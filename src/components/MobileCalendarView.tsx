@@ -11,8 +11,6 @@ interface MobileCalendarViewProps {
 
 export default function MobileCalendarView({
     months,
-    events,
-    predictedDates,
     onDayClick
 }: MobileCalendarViewProps) {
     return (
@@ -23,8 +21,6 @@ export default function MobileCalendarView({
                     <div key={month.toString()} id={headerId} className="max-w-md mx-auto mb-8">
                         <CalendarMonth 
                             month={month} 
-                            events={events} 
-                            predictedDates={predictedDates}
                             onDayClick={onDayClick} 
                         />
                     </div>
