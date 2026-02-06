@@ -7,6 +7,7 @@ import type { CalendarEvent } from '../types';
 interface CalendarMonthProps {
   month: Date;
   events?: CalendarEvent[];
+  predictedDates?: Set<string>;
   onDayClick?: (date: Date) => void;
   className?: string;
 }
@@ -14,20 +15,22 @@ interface CalendarMonthProps {
 const CalendarMonth: React.FC<CalendarMonthProps> = ({ 
   month, 
   events = [],
+  predictedDates,
   onDayClick,
   className = '' 
 }) => {
   // Memoize dates calculation to prevent unnecessary work on every render
-  const { periodDates, ovulationDates } = React.useMemo(() => {
+  const { periodDates, ovulationDates, predicted } = React.useMemo(() => {
     return {
       periodDates: events
         .filter(e => e.type === 'period')
         .map(e => parseISO(e.date)),
       ovulationDates: events
         .filter(e => e.type === 'ovulation')
-        .map(e => parseISO(e.date))
+        .map(e => parseISO(e.date)),
+      predicted: Array.from(predictedDates || []).map(d => parseISO(d))
     };
-  }, [events]);
+  }, [events, predictedDates]);
 
   return (
     <div className={`w-full ${className}`}>
@@ -39,12 +42,14 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         onDayClick={onDayClick}
         modifiers={{
           period: periodDates,
-          ovulation: ovulationDates
+          ovulation: ovulationDates,
+          predicted: predicted
         }}
         modifiersClassNames={{
           today: "[&_button]:border-2 [&_button]:border-slate-900 [&_button]:font-bold",
           period: "[&_button]:bg-rose-500 [&_button]:text-white",
-          ovulation: "[&_button]:bg-violet-500 [&_button]:text-white"
+          ovulation: "[&_button]:bg-violet-500 [&_button]:text-white",
+          predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50"
         }}
         classNames={{
           month_grid: "w-full table-fixed",

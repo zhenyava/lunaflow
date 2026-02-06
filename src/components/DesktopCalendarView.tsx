@@ -18,6 +18,7 @@ export default function DesktopCalendarView({
     onNextYear,
     months,
     events,
+    predictedDates,
     onDayClick
 }: DesktopCalendarViewProps) {
     return (
@@ -52,6 +53,7 @@ export default function DesktopCalendarView({
                             <CalendarMonth 
                                 month={month} 
                                 events={events}
+                                predictedDates={predictedDates}
                                 onDayClick={onDayClick}
                                 className="h-full w-full"
                             />
