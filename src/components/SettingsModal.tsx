@@ -76,7 +76,9 @@ export default function SettingsModal({
              {/* Navigation Links */}
              <div className="space-y-1 mb-3">
                  <a 
-                     href="mailto:support@lunaflow.app?subject=LunaFlow%20Feedback"
+                     href="https://forms.gle/CAMiGKwvQ99RCzdC6"
+                     target="_blank"
+                     rel="noopener noreferrer"
                      className="flex items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-100 hover:bg-slate-100 transition-colors group"
                  >
                      <MessageSquare size={16} className="text-slate-400 group-hover:text-rose-500" />
