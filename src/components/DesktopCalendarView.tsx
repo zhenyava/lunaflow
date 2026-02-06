@@ -17,6 +17,7 @@ export default function DesktopCalendarView({
     onPrevYear,
     onNextYear,
     months,
+    events,
     onDayClick
 }: DesktopCalendarViewProps) {
     return (
@@ -50,6 +51,7 @@ export default function DesktopCalendarView({
                         <div key={month.toString()} className="bg-white p-2 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center">
                             <CalendarMonth 
                                 month={month} 
+                                events={events}
                                 onDayClick={onDayClick}
                                 className="h-full w-full"
                             />
