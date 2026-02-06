@@ -18,12 +18,16 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   className = '' 
 }) => {
   // Memoize dates calculation to prevent unnecessary work on every render
-  const periodDates = React.useMemo(() => 
-    events
-      .filter(e => e.type === 'period')
-      .map(e => parseISO(e.date)),
-    [events]
-  );
+  const { periodDates, ovulationDates } = React.useMemo(() => {
+    return {
+      periodDates: events
+        .filter(e => e.type === 'period')
+        .map(e => parseISO(e.date)),
+      ovulationDates: events
+        .filter(e => e.type === 'ovulation')
+        .map(e => parseISO(e.date))
+    };
+  }, [events]);
 
   return (
     <div className={`w-full ${className}`}>
@@ -34,11 +38,13 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         hideNavigation
         onDayClick={onDayClick}
         modifiers={{
-          period: periodDates
+          period: periodDates,
+          ovulation: ovulationDates
         }}
         modifiersClassNames={{
           today: "[&_button]:border-2 [&_button]:border-slate-900 [&_button]:font-bold",
-          period: "[&_button]:bg-rose-500 [&_button]:text-white"
+          period: "[&_button]:bg-rose-500 [&_button]:text-white",
+          ovulation: "[&_button]:bg-violet-500 [&_button]:text-white"
         }}
         classNames={{
           month_grid: "w-full table-fixed",
