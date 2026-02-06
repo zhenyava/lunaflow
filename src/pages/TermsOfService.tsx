@@ -11,7 +11,6 @@ const TermsOfService = () => {
         </Link>
         
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Terms of Service</h1>
-        <p className="text-slate-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
         <div className="prose prose-slate max-w-none text-slate-600">
           <h3 className="text-xl font-bold text-slate-900 mt-8 mb-4">1. Acceptance of Terms</h3>

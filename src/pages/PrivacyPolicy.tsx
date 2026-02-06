@@ -11,7 +11,6 @@ const PrivacyPolicy = () => {
         </Link>
         
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Privacy Policy</h1>
-        <p className="text-slate-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
 
         <div className="prose prose-slate max-w-none text-slate-600">
           <p>
@@ -35,7 +34,7 @@ const PrivacyPolicy = () => {
           </p>
           <ul className="list-disc pl-6 mb-4 space-y-2">
             <li>
-              <strong>Access:</strong> The app accesses only the specific files it creates in your Google Drive (`appDataFolder`). It cannot see or access your other Google Drive files.
+              <strong>Access:</strong> The app accesses only the specific files it creates in your Google Drive (`LunaFlow`). It cannot see or access your other Google Drive files.
             </li>
             <li>
               <strong>Use:</strong> The app uses this access solely to read and write your encrypted cycle data JSON file (`lunaflow_data.json`) to sync your history across your devices.
@@ -61,7 +60,7 @@ const PrivacyPolicy = () => {
 
           <h3 className="text-xl font-bold text-slate-900 mt-8 mb-4">4. Contact Us</h3>
           <p>
-            If you have any questions about this Privacy Policy, please contact us at [Insert Your Support Email Here].
+            If you have any questions about this Privacy Policy, please contact us through <a href="https://forms.gle/CAMiGKwvQ99RCzdC6" target="_blank" rel="noreferrer" className="text-rose-500 hover:underline">this Google Form</a>.
           </p>
         </div>
       </div>
