@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Cloud, MessageSquare, Settings } from 'lucide-react';
+import { Cloud, MessageSquare, Settings } from 'lucide-react';
 import { FOLDER_NAME } from '../constants';
 
 interface SettingsModalProps {
@@ -36,7 +36,6 @@ export default function SettingsModal({
         <div className="max-w-md mx-auto mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm animate-in slide-in-from-top-2 absolute left-0 right-0 md:relative md:left-auto md:right-auto shadow-xl md:shadow-none z-50 md:z-auto max-h-[85vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-4">
                 <span className="font-semibold text-gray-700">App Settings</span>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18}/></button>
              </div>
 
              {/* Google Sync Section */}
