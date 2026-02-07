@@ -14,7 +14,6 @@ interface SettingsModalProps {
 
 export default function SettingsModal({
     isOpen,
-    onClose,
     isAuthenticated,
     googleClientId,
     setGoogleClientId,
