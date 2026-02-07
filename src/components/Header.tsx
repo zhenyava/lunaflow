@@ -64,7 +64,7 @@ export default function Header({
     );
 
     return (
-        <header className="flex-none bg-white border-b border-gray-100 shadow-sm z-10 px-4 py-3 md:py-4">
+        <header className="flex-none bg-white border-b border-gray-100 shadow-sm z-10 px-4 pt-3 pb-1.5 md:pt-4 md:pb-2">
             <div className="max-w-6xl mx-auto">
                <div className="flex justify-between items-center">
                    <div className="flex items-center gap-6">
@@ -97,8 +97,8 @@ export default function Header({
                </div>
 
                {/* Stats Row - Rendered separately to avoid pushing other elements and prevent jumping */}
-               <div className="h-5 flex items-end">
-                   <div className="text-xs text-slate-500 font-medium flex items-center gap-2 animate-in fade-in">
+               <div className="h-6 flex items-end">
+                   <div className="text-xs text-slate-500 font-medium flex items-center mt-1 gap-2 animate-in fade-in">
                        <div className="flex items-center gap-1">
                            <Activity size={12} className="text-rose-500"/>
                            <span>Cycle: <span className="text-slate-900 font-bold">{avgCycleLength ?? '?'}</span> days</span>
