@@ -60,7 +60,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
-            Track your cycle. <br className="hidden md:block" />
+            Track your cycle. <br />
             <span className="text-rose-500">Own your data.</span>
           </h1>
           
