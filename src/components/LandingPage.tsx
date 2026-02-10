@@ -139,8 +139,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
       <footer className="bg-slate-50 py-8 text-center text-slate-400 text-sm border-t border-slate-200">
         <p className="mb-4">&copy; {new Date().getFullYear()} LunaFlow. Your body, your data.</p>
         <div className="flex justify-center gap-6">
-           <a href="/privacy" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</a>
-           <a href="/terms" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</a>
+           <a href="/pages/privacy" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</a>
+           <a href="/pages/terms" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</a>
         </div>
       </footer>
     </div>
