@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import SmartRedirect from './components/SmartRedirect';
 import CalendarApp from './components/CalendarApp';
 import LandingPage from './components/LandingPage';
@@ -20,6 +21,7 @@ function App() {
         {/* 404 - redirect to home */}
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
+      <Analytics />
     </ErrorBoundary>
   );
 }
