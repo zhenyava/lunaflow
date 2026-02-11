@@ -2,14 +2,50 @@ import type { CalendarEvent, GoogleToken } from '../types';
 import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
+interface TokenClient {
+  callback: (resp: GoogleToken & { error?: unknown }) => Promise<void> | void;
+  requestAccessToken: (options: { prompt: string }) => void;
+}
+
+interface GapiFileResult<T = unknown> {
+  result: T;
+}
+
+interface GapiClient {
+  load: (lib: string, callback: () => void) => void;
+  client: {
+    init: (config: { discoveryDocs: string[] }) => Promise<void>;
+    setToken: (token: GoogleToken | null) => void;
+    getToken: () => GoogleToken | null;
+    drive: {
+      files: {
+        list: (params: Record<string, unknown>) => Promise<GapiFileResult<{ files: Array<{ id: string; name: string }> }>>;
+        create: (params: Record<string, unknown>) => Promise<GapiFileResult<{ id: string }>>;
+        get: (params: Record<string, unknown>) => Promise<GapiFileResult<unknown>>;
+      };
+    };
+  };
+}
+
 declare global {
   interface Window {
-    google: any;
-    gapi: any;
+    google: {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config: {
+            client_id: string;
+            scope: string;
+            callback: string | TokenClient['callback'];
+          }) => TokenClient;
+          revoke: (accessToken: string, callback: () => void) => void;
+        };
+      };
+    };
+    gapi: GapiClient;
   }
 }
 
-let tokenClient: any;
+let tokenClient: TokenClient | null = null;
 let gapiInited = false;
 let gisInited = false;
 
@@ -30,7 +66,7 @@ export const initializeGoogleApi = (
         });
         gapiInited = true;
         checkDone();
-      } catch (e) {
+      } catch (e: unknown) {
         console.error("Error initializing GAPI client", e);
       }
   };
@@ -44,7 +80,7 @@ export const initializeGoogleApi = (
         });
         gisInited = true;
         checkDone();
-      } catch (e) {
+      } catch (e: unknown) {
         console.error("Error initializing GIS client", e);
       }
   }
@@ -94,11 +130,12 @@ export const restoreGapiSession = (token: GoogleToken) => {
  */
 export const signInToGoogle = async (forceConsent: boolean = true): Promise<GoogleToken> => {
   return new Promise((resolve, reject) => {
-    if (!tokenClient) return reject('Google Identity Services not initialized');
+    if (!tokenClient) return reject(new Error('Google Identity Services not initialized'));
 
-    tokenClient.callback = async (resp: any) => {
+    tokenClient.callback = async (resp: GoogleToken & { error?: unknown }) => {
       if (resp.error) {
         reject(resp);
+        return;
       }
       
       // CRITICAL FIX: Connect the token from GIS to GAPI

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles } from 'lucide-react';
+import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 
@@ -21,7 +21,16 @@ interface HeaderProps {
     onLogout: () => void;
 }
 
-const TypeToggleButton = ({ type, label, icon: Icon, colorClass, activeType, setActiveType }: any) => (
+interface TypeToggleButtonProps {
+    type: EventType;
+    label: string;
+    icon: LucideIcon;
+    colorClass: string;
+    activeType: EventType;
+    setActiveType: (type: EventType) => void;
+}
+
+const TypeToggleButton = ({ type, label, icon: Icon, colorClass, activeType, setActiveType }: TypeToggleButtonProps) => (
     <button
         onClick={() => setActiveType(type)}
         className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium text-sm transition-all duration-200 ${

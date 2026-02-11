@@ -4,14 +4,8 @@ import type { CalendarEvent, EventType } from '../types';
 import { getLocalEvents, saveLocalEvents } from '../services/storageService';
 
 export function useCalendarEvents() {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>(() => getLocalEvents());
   const [activeType, setActiveType] = useState<EventType>('period');
-
-  // Load Local Data
-  useEffect(() => {
-    const local = getLocalEvents();
-    setEvents(local);
-  }, []);
 
   // Save to Local Storage immediately when events change
   useEffect(() => {
@@ -22,7 +16,7 @@ export function useCalendarEvents() {
     const dateStr = format(date, 'yyyy-MM-dd');
     setEvents(prev => {
       const existingIndex = prev.findIndex(e => e.date === dateStr);
-      let newEvents = [...prev];
+      const newEvents = [...prev];
       if (existingIndex >= 0) {
         const existing = newEvents[existingIndex];
         if (existing.type === activeType) {

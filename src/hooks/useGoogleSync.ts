@@ -54,7 +54,6 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     setSyncState({ status: 'syncing' });
     try {
         const remoteEvents = await fetchDriveDataContent(fileId);
-        // Use current events passed to hook
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         
@@ -70,59 +69,51 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         }
 
         setSyncState({ status: 'success', lastSynced: new Date() });
-    } catch (error: any) {
-        if (error.message === 'Unauthorized' || error.status === 401) {
+    } catch (error: unknown) {
+        const err = error as { message?: string; status?: number };
+        if (err.message === 'Unauthorized' || err.status === 401) {
             handleLogout();
         } else {
             setSyncState({ status: 'error' });
         }
     }
-  }, [events, setEvents, handleLogout]); // Depends on events
+  }, [events, setEvents, handleLogout]);
 
   // Token-based Session Restore
   useEffect(() => {
-    if (isApiInitialized && !isAuthenticated) {
-        try {
-            const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
-            if (storedTokenStr) {
-                const token: GoogleToken = JSON.parse(storedTokenStr);
-                const now = Date.now();
-                
-                if (token.expires_at && token.expires_at > now + 60000) {
-                    restoreGapiSession(token);
+    if (!isApiInitialized || isAuthenticated) return;
+
+    try {
+        const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
+        if (storedTokenStr) {
+            const token: GoogleToken = JSON.parse(storedTokenStr);
+            const now = Date.now();
+            
+            if (token.expires_at && token.expires_at > now + 60000) {
+                restoreGapiSession(token);
+                setTimeout(() => {
                     setIsAuthenticated(true);
                     ensureDriveFileExists()
                         .then(id => {
                             setDriveFileId(id);
-                            // We need to call performFullSync here, but we can't easily doing it 
-                            // directly inside this effect if we want to use the latest 'events' 
-                            // without adding 'events' to dependency array which might cause loops.
-                            // However, in the original code, it called performFullSync(id).
-                            // The original code had 'performFullSync' dependent on 'events'.
-                            // The original 'useEffect' for token restore depended only on [isApiInitialized].
-                            // This implies 'performFullSync' was using a closure or 'events' state was empty initially.
-                            
-                            // To be safe, we will call it. If events are empty, it merges remote into empty.
                             performFullSync(id); 
                         })
                         .catch(() => {
                             handleLogout();
                         });
-                } else {
-                    localStorage.removeItem('LUNA_AUTH_TOKEN');
+                }, 0);
+            } else {
+                localStorage.removeItem('LUNA_AUTH_TOKEN');
+                setTimeout(() => {
                     setIsAuthenticated(false);
                     setSyncState({ status: 'idle' });
-                }
+                }, 0);
             }
-        } catch (e) {
-            localStorage.removeItem('LUNA_AUTH_TOKEN');
         }
+    } catch {
+        localStorage.removeItem('LUNA_AUTH_TOKEN');
     }
-  }, [isApiInitialized, handleLogout, performFullSync]); 
-  // Added performFullSync to dependencies. Since performFullSync depends on events, 
-  // this effect runs when events change if isApiInitialized is true and !isAuthenticated.
-  // But wait, if !isAuthenticated is true, we run this. Once authenticated, we don't run this.
-  // So it's safe.
+  }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync]);
 
   const handleGoogleLogin = async () => {
     if (!googleClientId) {
@@ -143,12 +134,13 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
       setIsAuthenticated(true);
       await performFullSync(fileId);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       setSyncState({ status: 'error' });
       setIsAuthenticated(false);
       localStorage.removeItem('LUNA_AUTH_TOKEN');
       let errorMessage = "Login failed.";
-      if (error?.message) errorMessage = error.message;
+      const err = error as { message?: string };
+      if (err?.message) errorMessage = err.message;
       alert(errorMessage);
     }
   };
@@ -169,13 +161,14 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     if (!isAuthenticated || !driveFileId) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
-    setSyncState({ status: 'syncing' });
     const timeoutId = setTimeout(async () => {
+        setSyncState({ status: 'syncing' });
         try {
             await uploadDriveData(driveFileId, events);
             setSyncState({ status: 'success', lastSynced: new Date() });
-        } catch (error: any) {
-             if (error.message === 'Unauthorized' || error.status === 401) {
+        } catch (error: unknown) {
+             const err = error as { message?: string; status?: number };
+             if (err.message === 'Unauthorized' || err.status === 401) {
                 handleLogout();
             } else {
                 setSyncState({ status: 'error' });
@@ -184,8 +177,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     }, 2000); 
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, driveFileId, handleLogout]); 
-  // Note: performFullSync isn't used here, but 'events' is.
+  }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced]);
 
   return {
     isAuthenticated,
