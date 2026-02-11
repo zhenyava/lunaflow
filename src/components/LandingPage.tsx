@@ -18,7 +18,13 @@ const Testimonial = ({ name, text, stars }: { name: string, text: string, stars:
   </div>
 );
 
-const Feature = ({ icon: Icon, title, desc }: any) => (
+interface FeatureProps {
+  icon: React.ElementType;
+  title: string;
+  desc: string;
+}
+
+const Feature = ({ icon: Icon, title, desc }: FeatureProps) => (
   <div className="flex flex-col items-center text-center p-6">
     <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 mb-4">
       <Icon size={24} />
