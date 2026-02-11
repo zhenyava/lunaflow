@@ -15,10 +15,9 @@ import { GOOGLE_CLIENT_ID } from '../constants';
 interface UseGoogleSyncProps {
   events: CalendarEvent[];
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
-  onLoginSuccess?: () => void;
 }
 
-export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSyncProps) {
+export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
@@ -40,6 +39,14 @@ export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSy
       });
     }
   }, [googleClientId]);
+
+  const handleLogout = useCallback(() => {
+      revokeToken();
+      setIsAuthenticated(false);
+      setDriveFileId(null);
+      setSyncState({ status: 'idle' });
+      localStorage.removeItem('LUNA_AUTH_TOKEN');
+  }, []);
 
   // CORE SYNCHRONIZATION LOGIC
   const performFullSync = useCallback(async (fileId: string) => {
@@ -70,15 +77,7 @@ export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSy
             setSyncState({ status: 'error' });
         }
     }
-  }, [events, setEvents]); // Depends on events
-
-  const handleLogout = useCallback(() => {
-      revokeToken();
-      setIsAuthenticated(false);
-      setDriveFileId(null);
-      setSyncState({ status: 'idle' });
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
-  }, []);
+  }, [events, setEvents, handleLogout]); // Depends on events
 
   // Token-based Session Restore
   useEffect(() => {
@@ -105,8 +104,6 @@ export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSy
                             
                             // To be safe, we will call it. If events are empty, it merges remote into empty.
                             performFullSync(id); 
-                            
-                            if (onLoginSuccess) onLoginSuccess();
                         })
                         .catch(() => {
                             handleLogout();
@@ -121,7 +118,7 @@ export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSy
             localStorage.removeItem('LUNA_AUTH_TOKEN');
         }
     }
-  }, [isApiInitialized, onLoginSuccess, handleLogout, performFullSync]); 
+  }, [isApiInitialized, handleLogout, performFullSync]); 
   // Added performFullSync to dependencies. Since performFullSync depends on events, 
   // this effect runs when events change if isApiInitialized is true and !isAuthenticated.
   // But wait, if !isAuthenticated is true, we run this. Once authenticated, we don't run this.
@@ -144,7 +141,6 @@ export function useGoogleSync({ events, setEvents, onLoginSuccess }: UseGoogleSy
       const fileId = await ensureDriveFileExists();
       setDriveFileId(fileId);
       setIsAuthenticated(true);
-      if (onLoginSuccess) onLoginSuccess();
       await performFullSync(fileId);
 
     } catch (error: any) {

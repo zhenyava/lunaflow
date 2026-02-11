@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
-import { getLocalEvents } from '../services/storageService';
-import LandingPage from './LandingPage';
 import Header from './Header';
 import MobileCalendarView from './MobileCalendarView';
 import DesktopCalendarView from './DesktopCalendarView';
@@ -14,14 +12,11 @@ import { useCycleStats } from '../hooks/useCycleStats';
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
 const INITIAL_END_DATE = addMonths(startOfMonth(new Date()), 12);
 
-const LAUNCHED_KEY = 'lunaflow_has_launched';
-
 function CalendarApp() {
-  // Navigation State
-  const [showLanding, setShowLanding] = useState(true);
-  
   // Mobile uses a long list of months
-  const [mobileMonths, setMobileMonths] = useState<Date[]>([]);
+  const [mobileMonths] = useState<Date[]>(() => 
+    eachMonthOfInterval({ start: INITIAL_START_DATE, end: INITIAL_END_DATE })
+  );
   
   // Desktop uses a single year view
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
@@ -38,11 +33,6 @@ function CalendarApp() {
     handleDayClick 
   } = useCalendarEvents();
 
-  const handleStartApp = () => {
-      localStorage.setItem(LAUNCHED_KEY, 'true');
-      setShowLanding(false);
-  };
-
   const {
     isAuthenticated,
     syncState,
@@ -54,28 +44,11 @@ function CalendarApp() {
     driveFileId
   } = useGoogleSync({ 
       events, 
-      setEvents,
-      onLoginSuccess: handleStartApp 
+      setEvents
   });
 
   // Statistics & Predictions
   const { avgCycleLength, avgPeriodDuration, predictedDates } = useCycleStats(events, currentYear);
-
-  // 1. Check for Landing Page / First Launch
-  useEffect(() => {
-      const hasLaunched = localStorage.getItem(LAUNCHED_KEY);
-      const localEvents = getLocalEvents();
-      // If user has data or explicitly launched before, skip landing
-      if (hasLaunched || localEvents.length > 0) {
-          setShowLanding(false);
-      }
-  }, []);
-
-  // 2. Setup Mobile Calendar
-  useEffect(() => {
-    const monthList = eachMonthOfInterval({ start: INITIAL_START_DATE, end: INITIAL_END_DATE });
-    setMobileMonths(monthList);
-  }, []);
 
   // Desktop: Generate months for the selected year
   const desktopMonths = useMemo(() => {
@@ -91,20 +64,13 @@ function CalendarApp() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Only scroll if NOT showing landing page
-    if (!showLanding && scrollRef.current) {
+    if (scrollRef.current) {
         const currentMonthStart = startOfMonth(new Date());
         const currentId = `${format(currentMonthStart, 'yyyy-MM-dd')}-header`;
         const el = document.getElementById(currentId);
         if (el) el.scrollIntoView({ block: 'center' });
     }
-  }, [mobileMonths, showLanding]);
-
-
-  // Conditional Rendering
-  if (showLanding) {
-      return <LandingPage onStart={handleStartApp} />;
-  }
+  }, [mobileMonths]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative">

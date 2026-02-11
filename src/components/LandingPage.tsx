@@ -1,9 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Heart, Star, ChevronRight, Lock, Smartphone, Database, Github } from 'lucide-react';
-
-interface LandingPageProps {
-  onStart: () => void;
-}
+import { LAUNCHED_KEY } from '../constants';
 
 // Feature flag: set to true when we have real reviews to show
 const SHOW_REVIEWS = false;
@@ -30,7 +28,14 @@ const Feature = ({ icon: Icon, title, desc }: any) => (
   </div>
 );
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
+const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
+
+  const handleStart = () => {
+    localStorage.setItem(LAUNCHED_KEY, 'true');
+    navigate('/calendar');
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-slate-50 flex flex-col font-sans">
       {/* Navigation */}
@@ -69,7 +74,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
           </p>
           
           <button 
-            onClick={onStart}
+            onClick={handleStart}
             className="group relative inline-flex items-center justify-center gap-2 bg-slate-900 text-white px-8 py-4 rounded-full text-lg font-semibold transition-all hover:bg-slate-800 hover:shadow-lg hover:-translate-y-0.5"
           >
             Try it free
@@ -139,8 +144,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStart }) => {
       <footer className="bg-slate-50 py-8 text-center text-slate-400 text-sm border-t border-slate-200">
         <p className="mb-4">&copy; {new Date().getFullYear()} LunaFlow. Your body, your data.</p>
         <div className="flex justify-center gap-6">
-           <a href="/pages/privacy" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</a>
-           <a href="/pages/terms" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</a>
+           <a href="/pages/privacy.html" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</a>
+           <a href="/pages/terms.html" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</a>
         </div>
       </footer>
     </div>
