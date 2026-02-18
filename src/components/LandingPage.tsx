@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Shield, Heart, Star, ChevronRight, Lock, Smartphone, Database, Github } from 'lucide-react';
 import { LAUNCHED_KEY } from '../constants';
@@ -36,6 +36,28 @@ const Feature = ({ icon: Icon, title, desc }: FeatureProps) => (
 
 const LandingPage: React.FC = () => {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const canonicalHref = new URL('/home', window.location.origin).toString();
+    const existingLink = document.querySelector<HTMLLinkElement>("link[rel='canonical']");
+
+    if (existingLink) {
+      const previousHref = existingLink.href;
+      existingLink.href = canonicalHref;
+      return () => {
+        existingLink.href = previousHref;
+      };
+    }
+
+    const link = document.createElement('link');
+    link.rel = 'canonical';
+    link.href = canonicalHref;
+    document.head.appendChild(link);
+
+    return () => {
+      document.head.removeChild(link);
+    };
+  }, []);
 
   const handleStart = () => {
     localStorage.setItem(LAUNCHED_KEY, 'true');
