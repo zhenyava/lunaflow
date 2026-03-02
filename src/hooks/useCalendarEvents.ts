@@ -15,19 +15,20 @@ export function useCalendarEvents() {
   const handleDayClick = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     setEvents(prev => {
-      const existingIndex = prev.findIndex(e => e.date === dateStr);
-      const newEvents = [...prev];
-      if (existingIndex >= 0) {
-        const existing = newEvents[existingIndex];
+      const existing = prev.find(e => e.date === dateStr);
+
+      if (existing) {
         if (existing.type === activeType) {
-            newEvents.splice(existingIndex, 1);
+            // Remove the event if it already has the active type
+            return prev.filter(e => e.date !== dateStr);
         } else {
-            newEvents[existingIndex] = { ...existing, type: activeType };
+            // Update the event type
+            return prev.map(e => e.date === dateStr ? { ...e, type: activeType } : e);
         }
       } else {
-        newEvents.push({ date: dateStr, type: activeType });
+        // Add new event
+        return [...prev, { date: dateStr, type: activeType }];
       }
-      return newEvents;
     });
   }, [activeType]);
 
