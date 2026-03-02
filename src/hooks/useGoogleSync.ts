@@ -12,7 +12,7 @@ import {
 import { mergeEvents, saveLocalEvents } from '../services/storageService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
-function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
+export function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     const eventA = a[i];
