@@ -1,21 +1,21 @@
 import { differenceInDays, parseISO, addDays, format, isAfter } from 'date-fns';
-import type { CalendarEvent } from '../types';
+import type { CalendarEvent, EventType } from '../types';
 
 /**
- * Helper to group continuous period days into clusters (cycles)
+ * Helper to group continuous events of a specific type into clusters (cycles)
  */
-const getPeriodClusters = (events: CalendarEvent[]) => {
-  const periodEvents = events
-    .filter(e => e.type === 'period')
+const getClusters = (events: CalendarEvent[], type: EventType) => {
+  const filteredEvents = events
+    .filter(e => e.type === type)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (periodEvents.length === 0) return [];
+  if (filteredEvents.length === 0) return [];
 
   const clusters: CalendarEvent[][] = [];
   let currentCluster: CalendarEvent[] = [];
   let lastDate: Date | null = null;
 
-  for (const event of periodEvents) {
+  for (const event of filteredEvents) {
     const currentDate = parseISO(event.date);
     
     if (!lastDate) {
@@ -39,6 +39,9 @@ const getPeriodClusters = (events: CalendarEvent[]) => {
 
   return clusters;
 };
+
+const getPeriodClusters = (events: CalendarEvent[]) => getClusters(events, 'period');
+const getOvulationClusters = (events: CalendarEvent[]) => getClusters(events, 'ovulation');
 
 export const calculateAverageCycleLength = (events: CalendarEvent[]): number | null => {
   const clusters = getPeriodClusters(events);
@@ -72,6 +75,42 @@ export const calculateAverageDuration = (events: CalendarEvent[]): number | null
 
     const totalDuration = clusters.reduce((acc, cluster) => acc + cluster.length, 0);
     return Math.round(totalDuration / clusters.length) || null;
+};
+
+export const calculateAverageOvulationDuration = (events: CalendarEvent[]): number | null => {
+    const clusters = getOvulationClusters(events);
+    if (clusters.length === 0) return null;
+
+    const totalDuration = clusters.reduce((acc, cluster) => acc + cluster.length, 0);
+    return Math.round(totalDuration / clusters.length) || null;
+};
+
+/**
+ * Calculates average cycle length specifically from ovulation events.
+ */
+export const calculateAverageOvulationCycleLength = (events: CalendarEvent[]): number | null => {
+    const clusters = getOvulationClusters(events);
+
+    if (clusters.length < 2) return null;
+
+    const cycleStartDates = clusters.map(c => c[0].date);
+
+    let totalDays = 0;
+    let cycleCount = 0;
+
+    for (let i = 0; i < cycleStartDates.length - 1; i++) {
+        const start1 = parseISO(cycleStartDates[i]);
+        const start2 = parseISO(cycleStartDates[i+1]);
+        const diff = differenceInDays(start2, start1);
+
+        // Sanity check: 10 to 100 days
+        if (diff >= 10 && diff <= 100) {
+            totalDays += diff;
+            cycleCount++;
+        }
+    }
+
+    return cycleCount > 0 ? Math.round(totalDays / cycleCount) : null;
 };
 
 /**
@@ -117,34 +156,6 @@ export const predictFuturePeriods = (
 };
 
 /**
- * Calculates average cycle length specifically from ovulation events.
- */
-export const calculateAverageOvulationCycleLength = (events: CalendarEvent[]): number | null => {
-    const ovulationEvents = events
-        .filter(e => e.type === 'ovulation')
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-    if (ovulationEvents.length < 2) return null;
-
-    let totalDays = 0;
-    let cycleCount = 0;
-
-    for (let i = 0; i < ovulationEvents.length - 1; i++) {
-        const start1 = parseISO(ovulationEvents[i].date);
-        const start2 = parseISO(ovulationEvents[i+1].date);
-        const diff = differenceInDays(start2, start1);
-
-        // Sanity check: 10 to 100 days
-        if (diff >= 10 && diff <= 100) {
-            totalDays += diff;
-            cycleCount++;
-        }
-    }
-
-    return cycleCount > 0 ? Math.round(totalDays / cycleCount) : null;
-};
-
-/**
  * Generates a Set of date strings (YYYY-MM-DD) representing potential future ovulation days.
  */
 export const predictFutureOvulations = (
@@ -159,21 +170,27 @@ export const predictFutureOvulations = (
 
     if (!cycleLengthToUse || cycleLengthToUse < 10) return predicted;
 
-    const ovulationEvents = events
-        .filter(e => e.type === 'ovulation')
-        .sort((a, b) => a.date.localeCompare(b.date));
+    const clusters = getOvulationClusters(events);
+    if (clusters.length === 0) return predicted;
 
-    if (ovulationEvents.length === 0) return predicted;
+    const avgDuration = calculateAverageOvulationDuration(events) ?? 1;
 
-    // Start from the last known ovulation date
-    const lastOvulationDate = parseISO(ovulationEvents[ovulationEvents.length - 1].date);
+    // Start from the last known ovulation start date
+    const lastCluster = clusters[clusters.length - 1];
+    const lastOvulationDate = parseISO(lastCluster[0].date);
 
     // Project forward
     let nextOvulationDate = addDays(lastOvulationDate, cycleLengthToUse);
 
     // Generate until we hit the visual limit of the calendar
     while (!isAfter(nextOvulationDate, endDateLimit)) {
-        predicted.add(format(nextOvulationDate, 'yyyy-MM-dd'));
+        // Add all days for this predicted cycle (based on avg duration)
+        for (let i = 0; i < avgDuration; i++) {
+            const date = addDays(nextOvulationDate, i);
+            if (!isAfter(date, endDateLimit)) {
+                predicted.add(format(date, 'yyyy-MM-dd'));
+            }
+        }
 
         // Move to next cycle
         nextOvulationDate = addDays(nextOvulationDate, cycleLengthToUse);
