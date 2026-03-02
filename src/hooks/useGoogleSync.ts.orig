@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { CalendarEvent, GoogleToken, SyncState } from '../types';
-import { 
-  initializeGoogleApi, 
-  signInToGoogle, 
-  ensureDriveFileExists, 
-  uploadDriveData, 
+import {
+  initializeGoogleApi,
+  signInToGoogle,
+  ensureDriveFileExists,
+  uploadDriveData,
   fetchDriveDataContent,
   revokeToken,
   restoreGapiSession
@@ -18,8 +18,12 @@ function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
     const eventA = a[i];
     const eventB = b[i];
 
-    if (eventA.date !== eventB.date || eventA.type !== eventB.type) {
-      return false;
+    const keysA = Object.keys(eventA) as (keyof CalendarEvent)[];
+    const keysB = Object.keys(eventB) as (keyof CalendarEvent)[];
+
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (eventA[key] !== eventB[key]) return false;
     }
   }
   return true;
@@ -35,7 +39,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
-  
+
   // Use Client ID from constants or fallback to local storage
   const [googleClientId, setGoogleClientId] = useState(() => {
      return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
@@ -67,9 +71,9 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     setSyncState({ status: 'syncing' });
     try {
         const remoteEvents = await fetchDriveDataContent(fileId);
-        const localEvents = events; 
+        const localEvents = events;
         const merged = mergeEvents(localEvents, remoteEvents);
-        
+
         const isLocalDifferent = !eventsEqual(merged, localEvents);
         if (isLocalDifferent) {
              setEvents(merged);
@@ -101,7 +105,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         if (storedTokenStr) {
             const token: GoogleToken = JSON.parse(storedTokenStr);
             const now = Date.now();
-            
+
             if (token.expires_at && token.expires_at > now + 60000) {
                 restoreGapiSession(token);
                 setTimeout(() => {
@@ -109,7 +113,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
                     ensureDriveFileExists()
                         .then(id => {
                             setDriveFileId(id);
-                            performFullSync(id); 
+                            performFullSync(id);
                         })
                         .catch(() => {
                             handleLogout();
@@ -133,7 +137,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
       alert("Please enter a Google Client ID in the settings first.");
       return;
     }
-    
+
     try {
       setSyncState({ status: 'syncing' });
       const tokenResponse = await signInToGoogle(true);
@@ -187,7 +191,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
                 setSyncState({ status: 'error' });
             }
         }
-    }, 2000); 
+    }, 2000);
 
     return () => clearTimeout(timeoutId);
   }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced]);
