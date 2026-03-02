@@ -71,11 +71,15 @@ Similarly to periods, future ovulation days are projected based on historical av
 **Algorithm:**
 1.  **Inputs:**
     *   Last known marked ovulation date.
-    *   Average Cycle Length (calculated above from period clusters).
-2.  **Projection:**
-    *   `Next Ovulation Date` = `Last Ovulation Date` + `Avg Cycle Length`.
-3.  **Loop:** This process repeats, adding the `Avg Cycle Length` to the previous projected ovulation date, until the projection reaches the requested end date (limit).
+    *   Average Ovulation Cycle Length (calculated by finding the average difference in days between consecutive marked ovulation dates, excluding outliers).
+    *   Average Cycle Length (calculated above from period clusters) as a fallback.
+2.  **Determine Cycle Length:**
+    *   If `Average Ovulation Cycle Length` is available (at least 2 marked ovulations), use it.
+    *   Otherwise, fallback to `Average Cycle Length` (from periods).
+3.  **Projection:**
+    *   `Next Ovulation Date` = `Last Ovulation Date` + `Cycle Length`.
+4.  **Loop:** This process repeats, adding the `Cycle Length` to the previous projected ovulation date, until the projection reaches the requested end date (limit).
 
 **Notes:**
-*   If the Average Cycle Length cannot be calculated (is `null` or < 10), no predictions are generated.
+*   If no cycle length can be calculated from either ovulations or periods (is `null` or < 10), no predictions are generated.
 *   If there are no historically marked ovulation days, no predictions are generated.

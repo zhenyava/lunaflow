@@ -3,7 +3,8 @@ import {
   calculateAverageCycleLength, 
   calculateAverageDuration, 
   predictFuturePeriods,
-  predictFutureOvulations
+  predictFutureOvulations,
+  calculateAverageOvulationCycleLength
 } from './statsService';
 import type { CalendarEvent } from '../types';
 
@@ -205,7 +206,7 @@ describe('statsService', () => {
       expect(result.size).toBe(0);
     });
 
-    it('should predict future ovulation dates based on avg cycle length', () => {
+    it('should predict future ovulation dates based on avg cycle length (fallback)', () => {
       const events: CalendarEvent[] = [
         { date: '2024-01-14', type: 'ovulation' }
       ];
@@ -221,6 +222,61 @@ describe('statsService', () => {
       expect(prediction.has('2024-03-10')).toBe(true);
       expect(prediction.has('2024-04-07')).toBe(false); // Out of bounds
       expect(prediction.size).toBe(2);
+    });
+
+    it('should prioritize ovulation cycle average over period cycle average', () => {
+      const events: CalendarEvent[] = [
+        { date: '2024-01-01', type: 'ovulation' },
+        { date: '2024-01-31', type: 'ovulation' } // 30 day ovulation cycle
+      ];
+      // Suppose we pass 28 from the period calculation, but ovulation has a 30-day average
+      const periodAvgCycle = 28;
+      const limit = new Date('2024-04-05');
+
+      const prediction = predictFutureOvulations(events, periodAvgCycle, limit);
+
+      // Expected ovulations:
+      // Jan 31 + 30 = Mar 1 (Leap year 2024)
+      // Mar 1 + 30 = Mar 31
+      expect(prediction.has('2024-03-01')).toBe(true);
+      expect(prediction.has('2024-03-31')).toBe(true);
+      expect(prediction.size).toBe(2);
+    });
+  });
+
+  describe('calculateAverageOvulationCycleLength', () => {
+    it('should return null if fewer than 2 ovulation events', () => {
+        const events: CalendarEvent[] = [{ date: '2024-01-01', type: 'ovulation' }];
+        expect(calculateAverageOvulationCycleLength(events)).toBeNull();
+    });
+
+    it('should calculate correct ovulation cycle length for 2 events', () => {
+        const events: CalendarEvent[] = [
+            { date: '2024-01-01', type: 'ovulation' },
+            { date: '2024-01-29', type: 'ovulation' }
+        ];
+        expect(calculateAverageOvulationCycleLength(events)).toBe(28);
+    });
+
+    it('should average multiple ovulation cycle lengths', () => {
+        const events: CalendarEvent[] = [
+            { date: '2024-01-01', type: 'ovulation' },
+            { date: '2024-01-29', type: 'ovulation' },
+            { date: '2024-02-28', type: 'ovulation' } // 30 days diff
+        ];
+        // (28 + 30) / 2 = 29
+        expect(calculateAverageOvulationCycleLength(events)).toBe(29);
+    });
+
+    it('should filter out invalid ovulation cycle lengths (< 10 or > 100 days)', () => {
+        const events: CalendarEvent[] = [
+            { date: '2024-01-01', type: 'ovulation' },
+            { date: '2024-01-05', type: 'ovulation' }, // diff 4 days, ignore
+            { date: '2024-02-02', type: 'ovulation' }, // diff 28 days from Jan 5
+            { date: '2024-06-02', type: 'ovulation' }  // diff 121 days, ignore
+        ];
+        // Only 28 is valid
+        expect(calculateAverageOvulationCycleLength(events)).toBe(28);
     });
   });
 });

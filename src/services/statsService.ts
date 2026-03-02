@@ -115,6 +115,35 @@ export const predictFuturePeriods = (
 
     return predicted;
 };
+
+/**
+ * Calculates average cycle length specifically from ovulation events.
+ */
+export const calculateAverageOvulationCycleLength = (events: CalendarEvent[]): number | null => {
+    const ovulationEvents = events
+        .filter(e => e.type === 'ovulation')
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (ovulationEvents.length < 2) return null;
+
+    let totalDays = 0;
+    let cycleCount = 0;
+
+    for (let i = 0; i < ovulationEvents.length - 1; i++) {
+        const start1 = parseISO(ovulationEvents[i].date);
+        const start2 = parseISO(ovulationEvents[i+1].date);
+        const diff = differenceInDays(start2, start1);
+
+        // Sanity check: 10 to 100 days
+        if (diff >= 10 && diff <= 100) {
+            totalDays += diff;
+            cycleCount++;
+        }
+    }
+
+    return cycleCount > 0 ? Math.round(totalDays / cycleCount) : null;
+};
+
 /**
  * Generates a Set of date strings (YYYY-MM-DD) representing potential future ovulation days.
  */
@@ -125,7 +154,10 @@ export const predictFutureOvulations = (
 ): Set<string> => {
     const predicted = new Set<string>();
 
-    if (!avgCycleLength || avgCycleLength < 10) return predicted;
+    const avgOvulationCycle = calculateAverageOvulationCycleLength(events);
+    const cycleLengthToUse = avgOvulationCycle ?? avgCycleLength;
+
+    if (!cycleLengthToUse || cycleLengthToUse < 10) return predicted;
 
     const ovulationEvents = events
         .filter(e => e.type === 'ovulation')
@@ -137,14 +169,14 @@ export const predictFutureOvulations = (
     const lastOvulationDate = parseISO(ovulationEvents[ovulationEvents.length - 1].date);
 
     // Project forward
-    let nextOvulationDate = addDays(lastOvulationDate, avgCycleLength);
+    let nextOvulationDate = addDays(lastOvulationDate, cycleLengthToUse);
 
     // Generate until we hit the visual limit of the calendar
     while (!isAfter(nextOvulationDate, endDateLimit)) {
         predicted.add(format(nextOvulationDate, 'yyyy-MM-dd'));
 
         // Move to next cycle
-        nextOvulationDate = addDays(nextOvulationDate, avgCycleLength);
+        nextOvulationDate = addDays(nextOvulationDate, cycleLengthToUse);
     }
 
     return predicted;
