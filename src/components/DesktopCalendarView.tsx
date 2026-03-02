@@ -9,7 +9,6 @@ interface DesktopCalendarViewProps {
     months: Date[];
     events: CalendarEvent[];
     predictedDates: Set<string>;
-    predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;
 }
 
@@ -20,7 +19,6 @@ export default function DesktopCalendarView({
     months,
     events,
     predictedDates,
-    predictedOvulationDates,
     onDayClick
 }: DesktopCalendarViewProps) {
     return (
@@ -56,7 +54,6 @@ export default function DesktopCalendarView({
                                 month={month} 
                                 events={events}
                                 predictedDates={predictedDates}
-                                predictedOvulationDates={predictedOvulationDates}
                                 onDayClick={onDayClick}
                                 className="h-full w-full"
                             />

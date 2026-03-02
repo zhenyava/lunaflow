@@ -2,15 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { 
   calculateAverageCycleLength, 
   calculateAverageDuration, 
-  predictFuturePeriods,
-  predictFutureOvulations
-} from '../statsService';
+  predictFuturePeriods
+} from './statsService';
 import type { CalendarEvent } from '../types';
 
 describe('statsService', () => {
-  const createEvent = (date: string, type: CalendarEvent['type'] = 'period'): CalendarEvent => ({
+  const createEvent = (date: string): CalendarEvent => ({
     date,
-    type
+    type: 'period'
   });
 
   describe('calculateAverageCycleLength', () => {
@@ -191,5 +190,4 @@ describe('statsService', () => {
           expect(prediction.has('2024-03-01')).toBe(false); // Out of bounds
       });
   });
-
-  });
+});

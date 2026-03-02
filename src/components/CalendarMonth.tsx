@@ -8,7 +8,6 @@ interface CalendarMonthProps {
   month: Date;
   events?: CalendarEvent[];
   predictedDates?: Set<string>;
-  predictedOvulationDates?: Set<string>;
   onDayClick?: (date: Date) => void;
   className?: string;
 }
@@ -17,12 +16,11 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   month, 
   events = [],
   predictedDates,
-  predictedOvulationDates,
   onDayClick,
   className = '' 
 }) => {
   // Memoize dates calculation to prevent unnecessary work on every render
-  const { periodDates, ovulationDates, predicted, predictedOvulation } = React.useMemo(() => {
+  const { periodDates, ovulationDates, predicted } = React.useMemo(() => {
     return {
       periodDates: events
         .filter(e => e.type === 'period')
@@ -30,10 +28,9 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
       ovulationDates: events
         .filter(e => e.type === 'ovulation')
         .map(e => parseISO(e.date)),
-      predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
-      predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))
+      predicted: Array.from(predictedDates || []).map(d => parseISO(d))
     };
-  }, [events, predictedDates, predictedOvulationDates]);
+  }, [events, predictedDates]);
 
   return (
     <div className={`w-full ${className}`}>
@@ -46,15 +43,13 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         modifiers={{
           period: periodDates,
           ovulation: ovulationDates,
-          predicted: predicted,
-          predictedOvulation: predictedOvulation
+          predicted: predicted
         }}
         modifiersClassNames={{
           today: "[&_button]:border-2 [&_button]:border-slate-900 [&_button]:font-bold",
           period: "[&_button]:bg-rose-500 [&_button]:text-white",
           ovulation: "[&_button]:bg-violet-500 [&_button]:text-white",
-          predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
-          predictedOvulation: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-violet-300 [&_button]:text-violet-500 [&_button]:bg-violet-50"
+          predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50"
         }}
         classNames={{
           month_grid: "w-full table-fixed",
