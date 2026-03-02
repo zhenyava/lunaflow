@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles } from 'lucide-react';
+import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 
@@ -24,7 +24,7 @@ interface HeaderProps {
 interface TypeToggleButtonProps {
     type: EventType;
     label: string;
-    icon: React.ElementType;
+    icon: LucideIcon;
     colorClass: string;
     activeType: EventType;
     setActiveType: (type: EventType) => void;
