@@ -15,26 +15,19 @@ export function useCycleStats(events: CalendarEvent[], currentYear: number) {
   const avgPeriodDuration = useMemo(() => calculateAverageDuration(events, 'period'), [events]);
 
   // 2. Calculate Predictions
-  const predictedDates = useMemo(() => {
-    // Determine the range limit for predictions
-    // We want to cover at least 12 months ahead (for mobile infinite scroll)
-    // AND the entire selected desktop year.
+  const limit = useMemo(() => {
     const mobileLimit = addMonths(startOfMonth(new Date()), 12);
     const desktopLimit = endOfYear(new Date(currentYear, 0, 1));
-    
-    // Take the furthest date
-    const limit = max([mobileLimit, desktopLimit]);
-    
+    return max([mobileLimit, desktopLimit]);
+  }, [currentYear]);
+
+  const predictedDates = useMemo(() => {
     return predictFuturePeriods(events, avgCycleLength, limit);
-  }, [events, avgCycleLength, currentYear]);
+  }, [events, avgCycleLength, limit]);
 
   const predictedOvulationDates = useMemo(() => {
-    const mobileLimit = addMonths(startOfMonth(new Date()), 12);
-    const desktopLimit = endOfYear(new Date(currentYear, 0, 1));
-    const limit = max([mobileLimit, desktopLimit]);
-
     return predictFutureOvulations(events, avgOvulationCycleLength || avgCycleLength, limit);
-  }, [events, avgOvulationCycleLength, avgCycleLength, currentYear]);
+  }, [events, avgOvulationCycleLength, avgCycleLength, limit]);
 
   return {
     avgCycleLength,
