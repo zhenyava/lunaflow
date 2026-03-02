@@ -12,6 +12,23 @@ import {
 import { mergeEvents, saveLocalEvents } from '../services/storageService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
+function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const eventA = a[i];
+    const eventB = b[i];
+
+    const keysA = Object.keys(eventA) as (keyof CalendarEvent)[];
+    const keysB = Object.keys(eventB) as (keyof CalendarEvent)[];
+
+    if (keysA.length !== keysB.length) return false;
+    for (const key of keysA) {
+      if (eventA[key] !== eventB[key]) return false;
+    }
+  }
+  return true;
+}
+
 interface UseGoogleSyncProps {
   events: CalendarEvent[];
   setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
@@ -57,13 +74,13 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         
-        const isLocalDifferent = JSON.stringify(merged) !== JSON.stringify(localEvents);
+        const isLocalDifferent = !eventsEqual(merged, localEvents);
         if (isLocalDifferent) {
              setEvents(merged);
              saveLocalEvents(merged);
         }
 
-        const isRemoteDifferent = JSON.stringify(merged) !== JSON.stringify(remoteEvents);
+        const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
         if (isRemoteDifferent) {
              await uploadDriveData(fileId, merged);
         }
