@@ -46,8 +46,8 @@ export default function DesktopCalendarView({
             </div>
 
             {/* Months Grid (Single Year) */}
-            <div className="flex-1 min-h-0 flex justify-center items-center">
-                <div className="grid grid-cols-4 grid-rows-3 gap-x-6 gap-y-4 h-full w-auto max-w-full aspect-[4/3]">
+            <div className="flex-1 min-h-0 overflow-auto flex justify-center items-start">
+                <div className="grid grid-cols-4 gap-x-6 gap-y-6 w-full max-w-6xl mx-auto">
                     {months.map(month => (
                         <div key={month.toString()} className="bg-white p-2 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center">
                             <CalendarMonth 

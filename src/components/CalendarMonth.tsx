@@ -55,7 +55,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           month_grid: "w-full table-fixed",
           day: "p-0",
           // Removed transition-colors to eliminate perceived lag on click
-          day_button: "w-full aspect-square flex items-center justify-center rounded-full",
+          day_button: "w-full max-w-[2.5rem] mx-auto aspect-square flex items-center justify-center rounded-full text-sm sm:text-base",
         }}
       />
     </div>
