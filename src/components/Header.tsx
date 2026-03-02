@@ -80,7 +80,7 @@ export default function Header({
                <div className="flex justify-between items-center">
                    <div className="flex items-center gap-6">
                        <h1 
-                           onClick={() => navigate('/home')}
+                           onClick={() => navigate('/', { state: { fromApp: true } })}
                            className="text-2xl font-bold bg-gradient-to-r from-rose-500 to-violet-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity"
                        >
                          LunaFlow
