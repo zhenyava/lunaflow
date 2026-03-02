@@ -3,14 +3,22 @@ import { render } from '@testing-library/react';
 import SmartRedirect from './SmartRedirect';
 import { LAUNCHED_KEY } from '../constants';
 import * as storageService from '../services/storageService';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
-// Mock react-router-dom
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', () => ({
-  Navigate: ({ to }: { to: string }) => {
-    mockNavigate(to);
-    return null;
-  }
+
+// Mock react-router-dom properly for module
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => mockNavigate,
+  };
+});
+
+// Mock LandingPage
+vi.mock('./LandingPage', () => ({
+  default: () => <div data-testid="landing-page">Landing Page Mock</div>
 }));
 
 describe('SmartRedirect', () => {
@@ -25,40 +33,59 @@ describe('SmartRedirect', () => {
     vi.restoreAllMocks();
   });
 
-  it('redirects to /home for a completely new user', () => {
-    render(<SmartRedirect />);
-    
-    // Check if it redirected to /home
-    expect(mockNavigate).toHaveBeenCalledWith('/home');
+  const renderComponent = (initialEntries: string[] | { pathname: string, state?: Record<string, unknown> }[] = ['/']) => {
+    return render(
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="*" element={<SmartRedirect />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  };
+
+  it('renders LandingPage for a completely new user', () => {
+    const { getByTestId } = renderComponent();
+    expect(getByTestId('landing-page')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('redirects to /calendar if user has LAUNCHED_KEY in localStorage', () => {
     localStorage.setItem(LAUNCHED_KEY, 'true');
-    render(<SmartRedirect />);
-    
-    expect(mockNavigate).toHaveBeenCalledWith('/calendar');
+    renderComponent();
+
+    expect(mockNavigate).toHaveBeenCalledWith('/calendar', { replace: true });
   });
 
-  it('redirects to /calendar if user has local events (even without LAUNCHED_KEY)', () => {
-    // Mock getLocalEvents to return some events
-    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{ 
-      date: '2023-01-01', 
-      type: 'period' 
+  it('redirects to /calendar if user has local events', () => {
+    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{
+      date: '2023-01-01',
+      type: 'period'
     }]);
 
-    render(<SmartRedirect />);
-    
-    expect(mockNavigate).toHaveBeenCalledWith('/calendar');
+    renderComponent();
+
+    expect(mockNavigate).toHaveBeenCalledWith('/calendar', { replace: true });
   });
 
-  it('handles storage errors gracefully and redirects to /home', () => {
-    // Mock localStorage.getItem to throw an error
+  it('renders LandingPage if navigating from app (fromApp is true in state)', () => {
+    localStorage.setItem(LAUNCHED_KEY, 'true');
+    renderComponent([{ pathname: '/', state: { fromApp: true } }]);
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('handles storage errors gracefully and renders LandingPage', () => {
+    const originalConsoleError = console.error;
+    console.error = vi.fn(); // Hide the error in test output
+
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('Storage access denied');
     });
 
-    render(<SmartRedirect />);
-    
-    expect(mockNavigate).toHaveBeenCalledWith('/home');
+    const { getByTestId } = renderComponent();
+
+    expect(getByTestId('landing-page')).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    console.error = originalConsoleError;
   });
 });

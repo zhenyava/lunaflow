@@ -38,7 +38,7 @@ const LandingPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const canonicalHref = new URL('/home', window.location.origin).toString();
+    const canonicalHref = new URL('/', window.location.origin).toString();
     const existingLink = document.querySelector<HTMLLinkElement>("link[rel='canonical']");
 
     if (existingLink) {
