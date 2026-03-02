@@ -63,3 +63,19 @@ Predictions project the user's cycle into the future based on their historical a
 **Notes:**
 *   If the Average Cycle Length cannot be calculated (is `null` or < 10), no predictions are generated.
 *   If no Average Duration exists, a default of **5 days** is used.
+
+## 5. Future Ovulation Predictions
+
+Similarly to periods, future ovulation days are projected based on historical averages.
+
+**Algorithm:**
+1.  **Inputs:**
+    *   Last known marked ovulation date.
+    *   Average Cycle Length (calculated above from period clusters).
+2.  **Projection:**
+    *   `Next Ovulation Date` = `Last Ovulation Date` + `Avg Cycle Length`.
+3.  **Loop:** This process repeats, adding the `Avg Cycle Length` to the previous projected ovulation date, until the projection reaches the requested end date (limit).
+
+**Notes:**
+*   If the Average Cycle Length cannot be calculated (is `null` or < 10), no predictions are generated.
+*   If there are no historically marked ovulation days, no predictions are generated.

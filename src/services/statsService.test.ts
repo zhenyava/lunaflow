@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { 
   calculateAverageCycleLength, 
   calculateAverageDuration, 
-  predictFuturePeriods 
+  predictFuturePeriods,
+  predictFutureOvulations
 } from './statsService';
 import type { CalendarEvent } from '../types';
 
@@ -189,5 +190,37 @@ describe('statsService', () => {
           expect(prediction.has('2024-02-29')).toBe(true); // End of limit
           expect(prediction.has('2024-03-01')).toBe(false); // Out of bounds
       });
+  });
+
+  describe('predictFutureOvulations', () => {
+    it('should return empty set if cycle length is invalid', () => {
+      const events: CalendarEvent[] = [{ date: '2024-01-14', type: 'ovulation' }];
+      const result = predictFutureOvulations(events, null, new Date('2024-12-31'));
+      expect(result.size).toBe(0);
+    });
+
+    it('should return empty set if no ovulation events exist', () => {
+      const events: CalendarEvent[] = [{ date: '2024-01-01', type: 'period' }];
+      const result = predictFutureOvulations(events, 28, new Date('2024-12-31'));
+      expect(result.size).toBe(0);
+    });
+
+    it('should predict future ovulation dates based on avg cycle length', () => {
+      const events: CalendarEvent[] = [
+        { date: '2024-01-14', type: 'ovulation' }
+      ];
+      const avgCycle = 28;
+      const limit = new Date('2024-03-15');
+
+      const prediction = predictFutureOvulations(events, avgCycle, limit);
+
+      // Expected ovulations:
+      // Jan 14 + 28 = Feb 11
+      // Feb 11 + 28 = Mar 10
+      expect(prediction.has('2024-02-11')).toBe(true);
+      expect(prediction.has('2024-03-10')).toBe(true);
+      expect(prediction.has('2024-04-07')).toBe(false); // Out of bounds
+      expect(prediction.size).toBe(2);
+    });
   });
 });

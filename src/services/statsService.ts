@@ -115,3 +115,37 @@ export const predictFuturePeriods = (
 
     return predicted;
 };
+/**
+ * Generates a Set of date strings (YYYY-MM-DD) representing potential future ovulation days.
+ */
+export const predictFutureOvulations = (
+    events: CalendarEvent[],
+    avgCycleLength: number | null,
+    endDateLimit: Date
+): Set<string> => {
+    const predicted = new Set<string>();
+
+    if (!avgCycleLength || avgCycleLength < 10) return predicted;
+
+    const ovulationEvents = events
+        .filter(e => e.type === 'ovulation')
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (ovulationEvents.length === 0) return predicted;
+
+    // Start from the last known ovulation date
+    const lastOvulationDate = parseISO(ovulationEvents[ovulationEvents.length - 1].date);
+
+    // Project forward
+    let nextOvulationDate = addDays(lastOvulationDate, avgCycleLength);
+
+    // Generate until we hit the visual limit of the calendar
+    while (!isAfter(nextOvulationDate, endDateLimit)) {
+        predicted.add(format(nextOvulationDate, 'yyyy-MM-dd'));
+
+        // Move to next cycle
+        nextOvulationDate = addDays(nextOvulationDate, avgCycleLength);
+    }
+
+    return predicted;
+};
