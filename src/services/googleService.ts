@@ -29,6 +29,7 @@ interface GapiClient {
 
 declare global {
   interface Window {
+    gtag?: (...args: unknown[]) => void;
     google: {
       accounts: {
         oauth2: {
@@ -142,6 +143,10 @@ export const signInToGoogle = async (forceConsent: boolean = true): Promise<Goog
       // This is required for gapi.client.drive calls to work
       if (window.gapi && window.gapi.client) {
           window.gapi.client.setToken(resp);
+      }
+
+      if (window.gtag) {
+        window.gtag('event', 'google_drive_auth');
       }
 
       resolve(resp as GoogleToken);
