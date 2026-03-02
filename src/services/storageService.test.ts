@@ -35,7 +35,7 @@ describe('storageService - mergeEvents', () => {
     expect(mergeEvents(local, remote)).toEqual([createEvent('2024-01-01')]);
   });
 
-  it('should deduplicate events with same date but different types correctly', () => {
+  it('should keep events with same date but different types', () => {
     const local = [createEvent('2024-01-01', 'period')];
     const remote = [createEvent('2024-01-01', 'ovulation')];
 
@@ -47,6 +47,7 @@ describe('storageService - mergeEvents', () => {
   });
 
   it('should overwrite remote with local when keys match (object reference check)', () => {
+    // This is important because local changes should take precedence over remote during sync.
     const remoteEvent = createEvent('2024-01-01');
     const localEvent = createEvent('2024-01-01');
 
