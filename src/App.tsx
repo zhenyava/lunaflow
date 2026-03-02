@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Analytics } from '@vercel/analytics/react';
-import HomeRoute from './components/HomeRoute';
+import SmartRedirect from './components/SmartRedirect';
 import CalendarApp from './components/CalendarApp';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -9,7 +9,7 @@ function App() {
     <ErrorBoundary>
       <Routes>
         {/* Landing page at root with smart redirect logic */}
-        <Route path="/" element={<HomeRoute />} />
+        <Route path="/" element={<SmartRedirect />} />
         
         {/* Calendar app */}
         <Route path="/calendar" element={<CalendarApp />} />

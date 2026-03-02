@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
-import HomeRoute from './HomeRoute';
+import SmartRedirect from './SmartRedirect';
 import { LAUNCHED_KEY } from '../constants';
 import * as storageService from '../services/storageService';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -21,7 +21,7 @@ vi.mock('./LandingPage', () => ({
   default: () => <div data-testid="landing-page">Landing Page Mock</div>
 }));
 
-describe('HomeRoute', () => {
+describe('SmartRedirect', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     localStorage.clear();
@@ -37,7 +37,7 @@ describe('HomeRoute', () => {
     return render(
       <MemoryRouter initialEntries={initialEntries}>
         <Routes>
-          <Route path="*" element={<HomeRoute />} />
+          <Route path="*" element={<SmartRedirect />} />
         </Routes>
       </MemoryRouter>
     );

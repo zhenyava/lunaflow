@@ -4,7 +4,7 @@ import LandingPage from './LandingPage';
 import { LAUNCHED_KEY } from '../constants';
 import { getLocalEvents } from '../services/storageService';
 
-const HomeRoute = () => {
+const SmartRedirect = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -23,11 +23,11 @@ const HomeRoute = () => {
         navigate('/calendar', { replace: true });
       }
     } catch (e) {
-      console.error('HomeRoute storage error:', e);
+      console.error('SmartRedirect storage error:', e);
     }
   }, [navigate, location.state]);
 
   return <LandingPage />;
 };
 
-export default HomeRoute;
+export default SmartRedirect;
