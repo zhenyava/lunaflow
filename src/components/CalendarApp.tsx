@@ -48,7 +48,7 @@ function CalendarApp() {
   });
 
   // Statistics & Predictions
-  const { avgCycleLength, avgPeriodDuration, predictedDates } = useCycleStats(events, currentYear);
+  const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
 
   // Desktop: Generate months for the selected year
   const desktopMonths = useMemo(() => {
@@ -97,6 +97,7 @@ function CalendarApp() {
             months={mobileMonths}
             events={events}
             predictedDates={predictedDates}
+            predictedOvulationDates={predictedOvulationDates}
             onDayClick={handleDayClick}
         />
 
@@ -107,6 +108,7 @@ function CalendarApp() {
             months={desktopMonths}
             events={events}
             predictedDates={predictedDates}
+            predictedOvulationDates={predictedOvulationDates}
             onDayClick={handleDayClick}
         />
       </main>
