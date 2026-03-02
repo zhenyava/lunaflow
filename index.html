@@ -12,8 +12,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="LunaFlow" />
+    <title>LunaFlow - Free Privacy-Focused Period & Ovulation Tracker</title>
+    <meta name="description" content="Track your cycle. Own your data. The only menstrual tracker that lives entirely in your browser. No hidden servers, no data selling. Syncs exclusively with your Google Drive." />
 
-    <title>LunaFlow Tracker</title>
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.lunaflow.fit/" />
+    <meta property="og:title" content="LunaFlow - Free Privacy-Focused Period & Ovulation Tracker" />
+    <meta property="og:description" content="Track your cycle. Own your data. The only menstrual tracker that lives entirely in your browser. No hidden servers, no data selling. Syncs exclusively with your Google Drive." />
+    <meta property="og:image" content="https://www.lunaflow.fit/res/icon-192.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://www.lunaflow.fit/" />
+    <meta property="twitter:title" content="LunaFlow - Free Privacy-Focused Period & Ovulation Tracker" />
+    <meta property="twitter:description" content="Track your cycle. Own your data. The only menstrual tracker that lives entirely in your browser. No hidden servers, no data selling. Syncs exclusively with your Google Drive." />
+    <meta property="twitter:image" content="https://www.lunaflow.fit/res/icon-192.png" />
 
     <!-- 
       iOS ICONS
@@ -40,6 +54,16 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://apis.google.com/js/api.js"></script>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=%VITE_GOOGLE_ANALYTICS_ID%"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '%VITE_GOOGLE_ANALYTICS_ID%');
+    </script>
+
   </head>
   <body class="bg-slate-50 text-slate-900 overflow-hidden">
     <div id="root" class="h-full"></div>
