@@ -4,7 +4,8 @@ import type { CalendarEvent } from '../types';
 import { 
     calculateAverageCycleLength, 
     calculateAverageDuration, 
-    predictFuturePeriods 
+    predictFuturePeriods,
+    predictFutureOvulations
 } from '../services/statsService';
 
 export function useCycleStats(events: CalendarEvent[], currentYear: number) {
@@ -13,7 +14,7 @@ export function useCycleStats(events: CalendarEvent[], currentYear: number) {
   const avgPeriodDuration = useMemo(() => calculateAverageDuration(events), [events]);
 
   // 2. Calculate Predictions
-  const predictedDates = useMemo(() => {
+  const { predictedDates, predictedOvulationDates } = useMemo(() => {
     // Determine the range limit for predictions
     // We want to cover at least 12 months ahead (for mobile infinite scroll)
     // AND the entire selected desktop year.
@@ -23,12 +24,16 @@ export function useCycleStats(events: CalendarEvent[], currentYear: number) {
     // Take the furthest date
     const limit = max([mobileLimit, desktopLimit]);
     
-    return predictFuturePeriods(events, avgCycleLength, limit);
+    return {
+      predictedDates: predictFuturePeriods(events, avgCycleLength, limit),
+      predictedOvulationDates: predictFutureOvulations(events, avgCycleLength, limit)
+    };
   }, [events, avgCycleLength, currentYear]);
 
   return {
     avgCycleLength,
     avgPeriodDuration,
-    predictedDates
+    predictedDates,
+    predictedOvulationDates
   };
 }

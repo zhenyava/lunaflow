@@ -6,6 +6,7 @@ interface MobileCalendarViewProps {
     months: Date[];
     events: CalendarEvent[];
     predictedDates: Set<string>;
+    predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;
 }
 
@@ -13,6 +14,7 @@ export default function MobileCalendarView({
     months,
     events,
     predictedDates,
+    predictedOvulationDates,
     onDayClick
 }: MobileCalendarViewProps) {
     return (
@@ -25,6 +27,7 @@ export default function MobileCalendarView({
                             month={month} 
                             events={events}
                             predictedDates={predictedDates}
+                            predictedOvulationDates={predictedOvulationDates}
                             onDayClick={onDayClick} 
                         />
                     </div>
