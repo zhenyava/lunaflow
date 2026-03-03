@@ -20,10 +20,10 @@ export function useCalendarEvents() {
       if (existing) {
         if (existing.type === activeType) {
             // Remove the event if it already has the active type
-            return prev.filter(e => e !== existing);
+            return prev.filter(e => e.date !== dateStr);
         } else {
             // Update the event type
-            return prev.map(e => e === existing ? { ...e, type: activeType } : e);
+            return prev.map(e => e.date === dateStr ? { ...e, type: activeType } : e);
         }
       } else {
         // Add new event

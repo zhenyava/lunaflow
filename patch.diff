@@ -1,0 +1,15 @@
+--- src/hooks/useCalendarEvents.ts
++++ src/hooks/useCalendarEvents.ts
+@@ -19,10 +19,10 @@
+       if (existing) {
+         if (existing.type === activeType) {
+             // Remove the event if it already has the active type
+-            return prev.filter(e => e.date !== dateStr);
++            return prev.filter(e => e !== existing);
+         } else {
+             // Update the event type
+-            return prev.map(e => e.date === dateStr ? { ...e, type: activeType } : e);
++            return prev.map(e => e === existing ? { ...e, type: activeType } : e);
+         }
+       } else {
+         // Add new event
