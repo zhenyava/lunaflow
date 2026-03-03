@@ -50,7 +50,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           predictedOvulation: predictedOvulation
         }}
         modifiersClassNames={{
-          today: "[&_button]:border-2 [&_button]:border-slate-900 [&_button]:font-bold",
+          today: "[&_button]:border-2 [&_button]:border-slate-300 [&_button]:font-bold",
           period: "[&_button]:bg-rose-500 [&_button]:text-white",
           ovulation: "[&_button]:bg-violet-500 [&_button]:text-white",
           predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
@@ -58,7 +58,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         }}
         classNames={{
           month_grid: "w-full table-fixed",
-          day: "p-0",
+          day: "p-0.5",
           // Removed transition-colors to eliminate perceived lag on click
           day_button: "w-full aspect-square flex items-center justify-center rounded-full",
         }}
