@@ -156,6 +156,15 @@ describe('serviceName', () => {
 - **TypeScript**: Strict type checking
 - **No unused variables**: Enforce clean code
 
+### CI Pipeline
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) is set up to automatically run the following checks on every pull request to the `main` branch:
+1. `npm run lint` - static analysis
+2. `npm run test` - unit tests
+3. `npm run build` - build verification
+
+These checks are sequential and must pass before a PR can be merged.
+
 ### Before Committing
 1. Run `npm run lint` - fix all ESLint errors
 2. Run `npm run test` - ensure all tests pass
