@@ -1,3 +1,5 @@
+#!/bin/bash
+cat << 'INNER_EOF' > src/components/DesktopCalendarView.tsx
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { CalendarEvent } from '../types';
 import CalendarMonth from './CalendarMonth';
@@ -23,10 +25,10 @@ export default function DesktopCalendarView({
 }: DesktopCalendarViewProps) {
     return (
         <div className="hidden md:flex flex-col h-full py-4 px-4 w-full">
-            
+
             {/* Year Navigation - fixed height */}
             <div className="flex-none flex items-center justify-between mb-4 max-w-sm mx-auto bg-white rounded-full shadow-sm border border-gray-200 p-1 w-full">
-                <button 
+                <button
                     onClick={onPrevYear}
                     className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
                     aria-label="Previous Year"
@@ -36,7 +38,7 @@ export default function DesktopCalendarView({
                 <h2 className="text-xl font-bold text-slate-800 tabular-nums">
                     {currentYear}
                 </h2>
-                <button 
+                <button
                     onClick={onNextYear}
                     className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-600"
                     aria-label="Next Year"
@@ -50,8 +52,8 @@ export default function DesktopCalendarView({
                 <div className="grid grid-cols-4 grid-rows-3 gap-x-6 gap-y-4 w-full h-full min-h-[600px] max-w-full mx-auto">
                     {months.map(month => (
                         <div key={month.toString()} className="bg-white p-2 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-center min-h-[180px]">
-                            <CalendarMonth 
-                                month={month} 
+                            <CalendarMonth
+                                month={month}
                                 events={events}
                                 predictedDates={predictedDates}
                                 onDayClick={onDayClick}
@@ -64,3 +66,4 @@ export default function DesktopCalendarView({
         </div>
     );
 }
+INNER_EOF
