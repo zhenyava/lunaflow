@@ -23,15 +23,44 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
 }) => {
   // Memoize dates calculation to prevent unnecessary work on every render
   const { periodDates, ovulationDates, predicted, predictedOvulation } = React.useMemo(() => {
+    const pDates: Date[] = [];
+    const oDates: Date[] = [];
+
+    // Cache for parsed dates within this render cycle
+    const parsedCache: Record<string, Date> = {};
+    const getParsedDate = (d: string) => {
+      let parsed = parsedCache[d];
+      if (!parsed) {
+        // Fast path for strict YYYY-MM-DD format commonly used in the app
+        if (d.length === 10 && d[4] === '-' && d[7] === '-') {
+          const y = parseInt(d.slice(0, 4), 10);
+          const m = parseInt(d.slice(5, 7), 10) - 1;
+          const day = parseInt(d.slice(8, 10), 10);
+          parsed = new Date(y, m, day);
+        } else {
+          // Fallback to date-fns for other ISO formats
+          parsed = parseISO(d);
+        }
+        parsedCache[d] = parsed;
+      }
+      return parsed;
+    };
+
+    // Process events in a single loop instead of multiple filter/map passes
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      if (e.type === 'period') {
+        pDates.push(getParsedDate(e.date));
+      } else if (e.type === 'ovulation') {
+        oDates.push(getParsedDate(e.date));
+      }
+    }
+
     return {
-      periodDates: events
-        .filter(e => e.type === 'period')
-        .map(e => parseISO(e.date)),
-      ovulationDates: events
-        .filter(e => e.type === 'ovulation')
-        .map(e => parseISO(e.date)),
-      predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
-      predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))
+      periodDates: pDates,
+      ovulationDates: oDates,
+      predicted: Array.from(predictedDates || []).map(getParsedDate),
+      predictedOvulation: Array.from(predictedOvulationDates || []).map(getParsedDate)
     };
   }, [events, predictedDates, predictedOvulationDates]);
 
