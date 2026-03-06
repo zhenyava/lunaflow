@@ -7,18 +7,18 @@ import {
   calculateAverageOvulationCycleLength,
   calculateAverageOvulationDuration
 } from './statsService';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
 
 describe('statsService', () => {
-  const createEvent = (date: string): CalendarEvent => ({
+  const createEvent = (date: string): DailyRecord => ({
     date,
-    type: 'period'
+    updatedAt: 123, period: { isFlowing: true }
   });
 
   describe('calculateAverageCycleLength', () => {
     it('should return null if there are fewer than 2 cycles', () => {
       // 3 days of a single cycle
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         createEvent('2024-01-01'),
         createEvent('2024-01-02'),
         createEvent('2024-01-03'),
@@ -27,7 +27,7 @@ describe('statsService', () => {
     });
 
     it('should calculate correct cycle length for 2 regular cycles', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cycle 1 starts Jan 1
         createEvent('2024-01-01'),
         createEvent('2024-01-02'),
@@ -42,7 +42,7 @@ describe('statsService', () => {
     });
 
     it('should average multiple cycle lengths', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cycle 1: Jan 1
         createEvent('2024-01-01'), 
         // Cycle 2: Jan 29 (28 days later)
@@ -55,7 +55,7 @@ describe('statsService', () => {
     });
 
     it('should ignore short cycles (< 10 days)', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cycle 1: Jan 1
         createEvent('2024-01-01'),
         // Cycle 2: Jan 10 (9 days later - >7 gap so new cluster, but 9 < 10 so ignored cycle)
@@ -70,7 +70,7 @@ describe('statsService', () => {
     });
 
     it('should ignore long cycles (> 100 days)', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cycle 1: Jan 1
         createEvent('2024-01-01'),
         // Cycle 2: June 1 (152 days later - ignored)
@@ -82,7 +82,7 @@ describe('statsService', () => {
     });
 
     it('should handle unsorted events correctly', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         createEvent('2024-01-29'),
         createEvent('2024-01-01'),
       ];
@@ -90,7 +90,7 @@ describe('statsService', () => {
     });
 
     it('should handle gaps <= 7 days as same cluster (not a new cycle)', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         createEvent('2024-01-01'),
         createEvent('2024-01-02'),
         // Gap of 6 days (Jan 8 - Jan 2 = 6). Should remain in same cluster.
@@ -106,7 +106,7 @@ describe('statsService', () => {
     });
 
     it('should handle gaps > 7 days as new cluster', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         createEvent('2024-01-01'),
         // Gap of 8 days (Jan 9 - Jan 1 = 8). New cluster.
         createEvent('2024-01-09'), 
@@ -126,7 +126,7 @@ describe('statsService', () => {
     });
 
     it('should calculate average duration correctly', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cluster 1: 3 days
         createEvent('2024-01-01'),
         createEvent('2024-01-02'),
@@ -143,7 +143,7 @@ describe('statsService', () => {
     });
 
     it('should round duration to nearest integer', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cluster 1: 3 days
         createEvent('2024-01-01'),
         createEvent('2024-01-02'),
@@ -196,11 +196,11 @@ describe('statsService', () => {
 
   describe('predictFutureOvulations', () => {
     it('should handle multi-day ovulation events', () => {
-      const events: CalendarEvent[] = [
-        { date: '2024-01-09', type: 'ovulation' },
-        { date: '2024-01-10', type: 'ovulation' },
-        { date: '2024-02-09', type: 'ovulation' },
-        { date: '2024-02-10', type: 'ovulation' },
+      const events: DailyRecord[] = [
+        { date: '2024-01-09', updatedAt: 123, ovulation: { isConfirmed: true } },
+        { date: '2024-01-10', updatedAt: 123, ovulation: { isConfirmed: true } },
+        { date: '2024-02-09', updatedAt: 123, ovulation: { isConfirmed: true } },
+        { date: '2024-02-10', updatedAt: 123, ovulation: { isConfirmed: true } },
       ];
       const avgCycle = 28;
       const limit = new Date('2024-04-15');
@@ -217,20 +217,20 @@ describe('statsService', () => {
     });
 
     it('should return empty set if cycle length is invalid', () => {
-      const events: CalendarEvent[] = [{ date: '2024-01-14', type: 'ovulation' }];
+      const events: DailyRecord[] = [{ date: '2024-01-14', updatedAt: 123, ovulation: { isConfirmed: true } }];
       const result = predictFutureOvulations(events, null, new Date('2024-12-31'));
       expect(result.size).toBe(0);
     });
 
     it('should return empty set if no ovulation events exist', () => {
-      const events: CalendarEvent[] = [{ date: '2024-01-01', type: 'period' }];
+      const events: DailyRecord[] = [{ date: '2024-01-01', updatedAt: 123, period: { isFlowing: true } }];
       const result = predictFutureOvulations(events, 28, new Date('2024-12-31'));
       expect(result.size).toBe(0);
     });
 
     it('should predict future ovulation dates based on avg cycle length (fallback)', () => {
-      const events: CalendarEvent[] = [
-        { date: '2024-01-14', type: 'ovulation' }
+      const events: DailyRecord[] = [
+        { date: '2024-01-14', updatedAt: 123, ovulation: { isConfirmed: true } }
       ];
       const avgCycle = 28;
       const limit = new Date('2024-03-15');
@@ -247,9 +247,9 @@ describe('statsService', () => {
     });
 
     it('should prioritize ovulation cycle average over period cycle average', () => {
-      const events: CalendarEvent[] = [
-        { date: '2024-01-01', type: 'ovulation' },
-        { date: '2024-01-31', type: 'ovulation' } // 30 day ovulation cycle
+      const events: DailyRecord[] = [
+        { date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } },
+        { date: '2024-01-31', updatedAt: 123, ovulation: { isConfirmed: true } } // 30 day ovulation cycle
       ];
       // Suppose we pass 28 from the period calculation, but ovulation has a 30-day average
       const periodAvgCycle = 28;
@@ -268,34 +268,34 @@ describe('statsService', () => {
 
   describe('calculateAverageOvulationCycleLength', () => {
     it('should return null if fewer than 2 ovulation events', () => {
-        const events: CalendarEvent[] = [{ date: '2024-01-01', type: 'ovulation' }];
+        const events: DailyRecord[] = [{ date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } }];
         expect(calculateAverageOvulationCycleLength(events)).toBeNull();
     });
 
     it('should calculate correct ovulation cycle length for 2 events', () => {
-        const events: CalendarEvent[] = [
-            { date: '2024-01-01', type: 'ovulation' },
-            { date: '2024-01-29', type: 'ovulation' }
+        const events: DailyRecord[] = [
+            { date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } },
+            { date: '2024-01-29', updatedAt: 123, ovulation: { isConfirmed: true } }
         ];
         expect(calculateAverageOvulationCycleLength(events)).toBe(28);
     });
 
     it('should average multiple ovulation cycle lengths', () => {
-        const events: CalendarEvent[] = [
-            { date: '2024-01-01', type: 'ovulation' },
-            { date: '2024-01-29', type: 'ovulation' },
-            { date: '2024-02-28', type: 'ovulation' } // 30 days diff
+        const events: DailyRecord[] = [
+            { date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } },
+            { date: '2024-01-29', updatedAt: 123, ovulation: { isConfirmed: true } },
+            { date: '2024-02-28', updatedAt: 123, ovulation: { isConfirmed: true } } // 30 days diff
         ];
         // (28 + 30) / 2 = 29
         expect(calculateAverageOvulationCycleLength(events)).toBe(29);
     });
 
     it('should filter out invalid ovulation cycle lengths (< 10 or > 100 days)', () => {
-        const events: CalendarEvent[] = [
-            { date: '2024-01-01', type: 'ovulation' },
-            { date: '2024-01-05', type: 'ovulation' }, // diff 4 days, ignore
-            { date: '2024-02-02', type: 'ovulation' }, // diff 32 days from Jan 1
-            { date: '2024-06-02', type: 'ovulation' }  // diff 121 days, ignore
+        const events: DailyRecord[] = [
+            { date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } },
+            { date: '2024-01-05', updatedAt: 123, ovulation: { isConfirmed: true } }, // diff 4 days, ignore
+            { date: '2024-02-02', updatedAt: 123, ovulation: { isConfirmed: true } }, // diff 32 days from Jan 1
+            { date: '2024-06-02', updatedAt: 123, ovulation: { isConfirmed: true } }  // diff 121 days, ignore
         ];
         // Only 32 is valid
         expect(calculateAverageOvulationCycleLength(events)).toBe(32);
@@ -308,12 +308,12 @@ describe('statsService', () => {
     });
 
     it('should calculate average ovulation duration correctly', () => {
-      const events: CalendarEvent[] = [
+      const events: DailyRecord[] = [
         // Cluster 1: 2 days
-        { date: '2024-01-01', type: 'ovulation' },
-        { date: '2024-01-02', type: 'ovulation' },
+        { date: '2024-01-01', updatedAt: 123, ovulation: { isConfirmed: true } },
+        { date: '2024-01-02', updatedAt: 123, ovulation: { isConfirmed: true } },
         // Cluster 2: 1 day
-        { date: '2024-02-01', type: 'ovulation' }
+        { date: '2024-02-01', updatedAt: 123, ovulation: { isConfirmed: true } }
       ];
       // (2 + 1) / 2 = 1.5 -> round to 2
       expect(calculateAverageOvulationDuration(events)).toBe(2);

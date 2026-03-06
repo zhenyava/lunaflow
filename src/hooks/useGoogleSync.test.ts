@@ -1,47 +1,47 @@
 import { describe, it, expect } from 'vitest';
 import { eventsEqual } from './useGoogleSync';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
 
 describe('useGoogleSync - eventsEqual', () => {
   it('returns true for identical arrays', () => {
-    const arr1: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
-      { date: '2024-01-14', type: 'ovulation' },
+    const arr1: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
+      { date: '2024-01-14', updatedAt: 100, ovulation: { isConfirmed: true } },
     ];
-    const arr2: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
-      { date: '2024-01-14', type: 'ovulation' },
+    const arr2: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
+      { date: '2024-01-14', updatedAt: 100, ovulation: { isConfirmed: true } },
     ];
     expect(eventsEqual(arr1, arr2)).toBe(true);
   });
 
   it('returns false when arrays have different lengths', () => {
-    const arr1: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
+    const arr1: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
     ];
-    const arr2: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
-      { date: '2024-01-14', type: 'ovulation' },
+    const arr2: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
+      { date: '2024-01-14', updatedAt: 100, ovulation: { isConfirmed: true } },
     ];
     expect(eventsEqual(arr1, arr2)).toBe(false);
   });
 
   it('returns false when a date is different', () => {
-    const arr1: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
+    const arr1: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
     ];
-    const arr2: CalendarEvent[] = [
-      { date: '2024-01-02', type: 'period' },
+    const arr2: DailyRecord[] = [
+      { date: '2024-01-02', updatedAt: 100, period: { isFlowing: true } },
     ];
     expect(eventsEqual(arr1, arr2)).toBe(false);
   });
 
-  it('returns false when a type is different', () => {
-    const arr1: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'period' },
+  it('returns false when updatedAt is different', () => {
+    const arr1: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } },
     ];
-    const arr2: CalendarEvent[] = [
-      { date: '2024-01-01', type: 'ovulation' },
+    const arr2: DailyRecord[] = [
+      { date: '2024-01-01', updatedAt: 200, period: { isFlowing: true } },
     ];
     expect(eventsEqual(arr1, arr2)).toBe(false);
   });

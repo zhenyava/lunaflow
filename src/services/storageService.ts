@@ -1,7 +1,31 @@
-import type { CalendarEvent } from '../types';
+import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { LOCAL_STORAGE_KEY } from '../constants';
 
-export const saveLocalEvents = (events: CalendarEvent[]) => {
+const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord[] => {
+  const map = new Map<string, DailyRecord>();
+  const now = Date.now();
+
+  legacyEvents.forEach(event => {
+    let record = map.get(event.date);
+    if (!record) {
+      record = {
+        date: event.date,
+        updatedAt: now,
+      };
+      map.set(event.date, record);
+    }
+
+    if (event.type === 'period') {
+      record.period = { isFlowing: true };
+    } else if (event.type === 'ovulation') {
+      record.ovulation = { isConfirmed: true };
+    }
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+};
+
+export const saveLocalEvents = (events: DailyRecord[]) => {
   try {
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(events));
   } catch (e) {
@@ -9,34 +33,41 @@ export const saveLocalEvents = (events: CalendarEvent[]) => {
   }
 };
 
-export const getLocalEvents = (): CalendarEvent[] => {
+export const getLocalEvents = (): DailyRecord[] => {
   try {
     const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
+    if (!data) return [];
+
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+
+    // Check if it's legacy data
+    if ('type' in parsed[0]) {
+      const migrated = migrateToDailyRecords(parsed as LegacyCalendarEvent[]);
+      saveLocalEvents(migrated); // Save the migrated data back immediately
+      return migrated;
+    }
+
+    return parsed as DailyRecord[];
   } catch (e) {
     console.error('Failed to load from local storage', e);
     return [];
   }
 };
 
-export const mergeEvents = (local: CalendarEvent[], remote: CalendarEvent[]): CalendarEvent[] => {
-  // Strategy: Union of all events based on unique Date + Type key.
-  const map = new Map<string, CalendarEvent>();
+export const mergeEvents = (local: DailyRecord[], remote: DailyRecord[]): DailyRecord[] => {
+  const map = new Map<string, DailyRecord>();
   
-  // 1. Add remote events first
-  remote.forEach(evt => {
-    const key = `${evt.date}-${evt.type}`;
-    map.set(key, evt);
-  });
-  
-  // 2. Add/Overwrite with local events
-  // Since our events are simple (date+type), overwriting is safe (same data).
-  // This ensures that if we have a local event that isn't in remote yet, it gets added.
-  local.forEach(evt => {
-    const key = `${evt.date}-${evt.type}`;
-    map.set(key, evt);
-  });
+  const allRecords = [...local, ...remote];
 
-  // 3. Convert back to array and sort chronologically
+  for (const record of allRecords) {
+    const existing = map.get(record.date);
+    
+    // If the record doesn't exist yet, or the current one is newer
+    if (!existing || record.updatedAt > existing.updatedAt) {
+      map.set(record.date, { ...record }); // Deep clone or spread is safe enough for this level
+    }
+  }
+
   return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
 };

@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
 import CalendarMonth from './CalendarMonth';
 
 interface DesktopCalendarViewProps {
@@ -7,7 +7,7 @@ interface DesktopCalendarViewProps {
     onPrevYear: () => void;
     onNextYear: () => void;
     months: Date[];
-    events: CalendarEvent[];
+    events: DailyRecord[];
     predictedDates: Set<string>;
     predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;

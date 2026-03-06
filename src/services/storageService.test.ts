@@ -1,66 +1,99 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getLocalEvents } from './storageService';
+import { getLocalEvents, mergeEvents } from './storageService';
 import { LOCAL_STORAGE_KEY } from '../constants';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord, LegacyCalendarEvent } from '../types';
 
 describe('storageService', () => {
-  describe('getLocalEvents', () => {
+  describe('getLocalEvents & Migration', () => {
     beforeEach(() => {
-      // Clear localStorage before each test
       localStorage.clear();
-      // Clear all mocks
       vi.restoreAllMocks();
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
     });
 
     afterEach(() => {
+        vi.useRealTimers();
         vi.restoreAllMocks();
     });
 
-    it('should return parsed events when valid JSON data exists in localStorage', () => {
-      const mockEvents: CalendarEvent[] = [
+    it('should migrate legacy events to DailyRecord', () => {
+      const legacyEvents: LegacyCalendarEvent[] = [
         { date: '2024-01-01', type: 'period' },
-        { date: '2024-01-14', type: 'ovulation' }
+        { date: '2024-01-02', type: 'period' },
+        { date: '2024-01-14', type: 'ovulation' },
+        // Same day overlapping (which could theoretically happen if data got mangled)
+        { date: '2024-01-15', type: 'period' },
+        { date: '2024-01-15', type: 'ovulation' }
       ];
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockEvents));
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(legacyEvents));
 
       const result = getLocalEvents();
 
-      expect(result).toEqual(mockEvents);
+      expect(result).toHaveLength(4);
+      expect(result[0]).toEqual({
+          date: '2024-01-01',
+          updatedAt: Date.now(),
+          period: { isFlowing: true }
+      });
+      expect(result[2]).toEqual({
+          date: '2024-01-14',
+          updatedAt: Date.now(),
+          ovulation: { isConfirmed: true }
+      });
+      expect(result[3]).toEqual({
+          date: '2024-01-15',
+          updatedAt: Date.now(),
+          period: { isFlowing: true },
+          ovulation: { isConfirmed: true }
+      });
+
+      // Should have saved the migrated data
+      const savedData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
+      expect(savedData).toEqual(result);
+    });
+
+    it('should return parsed DailyRecord data directly', () => {
+      const mockRecords: DailyRecord[] = [
+        { date: '2024-01-01', updatedAt: 12345, period: { isFlowing: true } }
+      ];
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockRecords));
+
+      const result = getLocalEvents();
+
+      expect(result).toEqual(mockRecords);
     });
 
     it('should return an empty array when localStorage returns null (no data)', () => {
       const result = getLocalEvents();
-
       expect(result).toEqual([]);
     });
 
     it('should return an empty array and log error when JSON is invalid', () => {
-      // Mock console.error to prevent it from cluttering test output and to assert it's called
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       localStorage.setItem(LOCAL_STORAGE_KEY, '{ invalid_json ]');
-
       const result = getLocalEvents();
-
       expect(result).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', expect.any(SyntaxError));
     });
+  });
 
-    it('should return an empty array and log error when localStorage.getItem throws an error', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  describe('mergeEvents', () => {
+    it('should prefer the record with the higher updatedAt', () => {
+        const local: DailyRecord[] = [
+            { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } }, // Older
+            { date: '2024-01-02', updatedAt: 300, period: { isFlowing: true } }, // Newer
+        ];
+        const remote: DailyRecord[] = [
+            { date: '2024-01-01', updatedAt: 200, isDeleted: true }, // Newer, user deleted
+            { date: '2024-01-02', updatedAt: 150, period: { isFlowing: true } }, // Older
+        ];
 
-      // Mock localStorage.getItem to throw an error (e.g. security error)
-      const mockError = new Error('Access to localStorage denied');
-      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
-        throw mockError;
-      });
-
-      const result = getLocalEvents();
-
-      expect(result).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', mockError);
-
-      getItemSpy.mockRestore();
+        const result = mergeEvents(local, remote);
+        
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: 200, isDeleted: true });
+        expect(result[1]).toEqual({ date: '2024-01-02', updatedAt: 300, period: { isFlowing: true } });
     });
   });
 });

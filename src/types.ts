@@ -1,6 +1,22 @@
 export type EventType = 'period' | 'ovulation';
 
-export interface CalendarEvent {
+export type FlowIntensity = 'light' | 'medium' | 'heavy' | 'spotting';
+
+export interface DailyRecord {
+  date: string; // ISO format YYYY-MM-DD
+  period?: {
+    isFlowing: boolean;
+    intensity?: FlowIntensity;
+  };
+  ovulation?: {
+    isPredicted?: boolean;
+    isConfirmed?: boolean;
+  };
+  updatedAt: number;
+  isDeleted?: boolean;
+}
+
+export interface LegacyCalendarEvent {
   date: string; // ISO format YYYY-MM-DD
   type: EventType;
 }

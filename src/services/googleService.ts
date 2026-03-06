@@ -1,4 +1,4 @@
-import type { CalendarEvent, GoogleToken } from '../types';
+import type { DailyRecord, GoogleToken } from '../types';
 import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
@@ -253,7 +253,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
 /**
  * Uploads data to a specific File ID using PATCH
  */
-export const uploadDriveData = async (fileId: string, events: CalendarEvent[]): Promise<void> => {
+export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Promise<void> => {
   const token = window.gapi.client.getToken();
   if (!token) throw new Error("No token for upload");
 
@@ -282,13 +282,13 @@ export const uploadDriveData = async (fileId: string, events: CalendarEvent[]): 
   }
 };
 
-export const fetchDriveDataContent = async (fileId: string): Promise<CalendarEvent[]> => {
+export const fetchDriveDataContent = async (fileId: string): Promise<DailyRecord[]> => {
     try {
         const fileResponse = await window.gapi.client.drive.files.get({
             fileId: fileId,
             alt: 'media'
         });
-        return fileResponse.result as CalendarEvent[];
+        return fileResponse.result as DailyRecord[];
     } catch (error) {
         console.error("Fetch Content Error", error);
         throw error;

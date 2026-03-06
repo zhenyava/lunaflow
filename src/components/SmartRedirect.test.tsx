@@ -59,7 +59,7 @@ describe('SmartRedirect', () => {
   it('redirects to /calendar if user has local events', () => {
     vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{
       date: '2023-01-01',
-      type: 'period'
+      updatedAt: 123, period: { isFlowing: true }
     }]);
 
     renderComponent();

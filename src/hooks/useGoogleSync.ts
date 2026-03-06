@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CalendarEvent, GoogleToken, SyncState } from '../types';
+import type { DailyRecord, GoogleToken, SyncState } from '../types';
 import { 
   initializeGoogleApi, 
   signInToGoogle, 
@@ -12,13 +12,17 @@ import {
 import { mergeEvents, saveLocalEvents } from '../services/storageService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
-export function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
+export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     const eventA = a[i];
     const eventB = b[i];
 
-    if (eventA.date !== eventB.date || eventA.type !== eventB.type) {
+    if (
+      eventA.date !== eventB.date || 
+      eventA.updatedAt !== eventB.updatedAt || 
+      eventA.isDeleted !== eventB.isDeleted
+    ) {
       return false;
     }
   }
@@ -26,8 +30,8 @@ export function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
 }
 
 interface UseGoogleSyncProps {
-  events: CalendarEvent[];
-  setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+  events: DailyRecord[];
+  setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
 }
 
 export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {

@@ -1,18 +1,18 @@
 import { differenceInDays, parseISO, addDays, format, isAfter } from 'date-fns';
-import type { CalendarEvent, EventType } from '../types';
+import type { DailyRecord, EventType } from '../types';
 
 /**
  * Helper to group continuous events of a specific type into clusters (cycles)
  */
-const getClusters = (events: CalendarEvent[], type: EventType) => {
+const getClusters = (events: DailyRecord[], type: EventType) => {
   const filteredEvents = events
-    .filter(e => e.type === type)
+    .filter(e => !e.isDeleted && (type === 'period' ? e.period?.isFlowing : e.ovulation?.isConfirmed))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (filteredEvents.length === 0) return [];
 
-  const clusters: CalendarEvent[][] = [];
-  let currentCluster: CalendarEvent[] = [];
+  const clusters: DailyRecord[][] = [];
+  let currentCluster: DailyRecord[] = [];
   let lastDate: Date | null = null;
 
   for (const event of filteredEvents) {
@@ -40,10 +40,10 @@ const getClusters = (events: CalendarEvent[], type: EventType) => {
   return clusters;
 };
 
-const getPeriodClusters = (events: CalendarEvent[]) => getClusters(events, 'period');
-const getOvulationClusters = (events: CalendarEvent[]) => getClusters(events, 'ovulation');
+const getPeriodClusters = (events: DailyRecord[]) => getClusters(events, 'period');
+const getOvulationClusters = (events: DailyRecord[]) => getClusters(events, 'ovulation');
 
-export const calculateAverageCycleLength = (events: CalendarEvent[]): number | null => {
+export const calculateAverageCycleLength = (events: DailyRecord[]): number | null => {
   const clusters = getPeriodClusters(events);
 
   // Need at least 2 cycles to calculate a gap
@@ -69,7 +69,7 @@ export const calculateAverageCycleLength = (events: CalendarEvent[]): number | n
   return cycleCount > 0 ? Math.round(totalDays / cycleCount) : null;
 };
 
-export const calculateAverageDuration = (events: CalendarEvent[]): number | null => {
+export const calculateAverageDuration = (events: DailyRecord[]): number | null => {
     const clusters = getPeriodClusters(events);
     if (clusters.length === 0) return null;
 
@@ -77,7 +77,7 @@ export const calculateAverageDuration = (events: CalendarEvent[]): number | null
     return Math.round(totalDuration / clusters.length) || null;
 };
 
-export const calculateAverageOvulationDuration = (events: CalendarEvent[]): number | null => {
+export const calculateAverageOvulationDuration = (events: DailyRecord[]): number | null => {
     const clusters = getOvulationClusters(events);
     if (clusters.length === 0) return null;
 
@@ -88,7 +88,7 @@ export const calculateAverageOvulationDuration = (events: CalendarEvent[]): numb
 /**
  * Calculates average cycle length specifically from ovulation events.
  */
-export const calculateAverageOvulationCycleLength = (events: CalendarEvent[]): number | null => {
+export const calculateAverageOvulationCycleLength = (events: DailyRecord[]): number | null => {
     const clusters = getOvulationClusters(events);
 
     if (clusters.length < 2) return null;
@@ -117,7 +117,7 @@ export const calculateAverageOvulationCycleLength = (events: CalendarEvent[]): n
  * Generates a Set of date strings (YYYY-MM-DD) representing potential future period days.
  */
 export const predictFuturePeriods = (
-    events: CalendarEvent[], 
+    events: DailyRecord[], 
     avgCycleLength: number | null,
     endDateLimit: Date
 ): Set<string> => {
@@ -159,7 +159,7 @@ export const predictFuturePeriods = (
  * Generates a Set of date strings (YYYY-MM-DD) representing potential future ovulation days.
  */
 export const predictFutureOvulations = (
-    events: CalendarEvent[],
+    events: DailyRecord[],
     avgCycleLength: number | null,
     endDateLimit: Date
 ): Set<string> => {
