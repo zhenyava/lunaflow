@@ -3,8 +3,8 @@ import { Analytics } from '@vercel/analytics/react';
 import SmartRedirect from './components/SmartRedirect';
 import CalendarApp from './components/CalendarApp';
 import ErrorBoundary from './components/ErrorBoundary';
-import Privacy from './pages/Privacy';
-import Terms from './pages/Terms';
+import Privacy from './components/Privacy';
+import Terms from './components/Terms';
 
 function App() {
   return (
