@@ -2,22 +2,55 @@ export type EventType = 'period' | 'ovulation';
 
 export type FlowIntensity = 'light' | 'medium' | 'heavy' | 'spotting';
 
+/**
+ * Core data entity representing a single day in the calendar.
+ * Replaces the old Event-based model to support multi-device sync and tombstones.
+ */
 export interface DailyRecord {
-  date: string; // ISO format YYYY-MM-DD
+  /** The date of the record in ISO YYYY-MM-DD format (e.g., "2024-03-24"). Acts as the Primary Key. */
+  date: string; 
+
+  /** 
+   * Data related to menstrual flow for this day. 
+   * If the property exists, it indicates that tracking for periods was recorded.
+   */
   period?: {
+    /** True if there was active bleeding/flow on this day. */
     isFlowing: boolean;
+    /** Optional detail about the flow volume (for future use). */
     intensity?: FlowIntensity;
   };
+
+  /** 
+   * Data related to ovulation tracking. 
+   */
   ovulation?: {
+    /** Indicates if this ovulation was predicted by an algorithm (not yet fully implemented). */
     isPredicted?: boolean;
+    /** True if the user manually confirmed ovulation (e.g., via a test kit). */
     isConfirmed?: boolean;
   };
+
+  /** 
+   * Unix timestamp (milliseconds) of the last time this record was modified.
+   * Crucial for the Sync Engine (Last-Write-Wins strategy) to resolve conflicts between devices.
+   */
   updatedAt: number;
+
+  /** 
+   * The "Tombstone" flag. If true, this record is treated as deleted.
+   * We keep deleted records to ensure that deletions are synchronized correctly across devices
+   * and not "resurrected" by the Google Drive sync engine.
+   */
   isDeleted?: boolean;
 }
 
+/** 
+ * Legacy format used in the initial version of the app.
+ * Retained temporarily to support automatic data migration.
+ */
 export interface LegacyCalendarEvent {
-  date: string; // ISO format YYYY-MM-DD
+  date: string;
   type: EventType;
 }
 
