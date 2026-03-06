@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Shield, Heart, Star, ChevronRight, Lock, Smartphone, Database, Github } from 'lucide-react';
 import { LAUNCHED_KEY } from '../constants';
 
@@ -172,8 +172,8 @@ const LandingPage: React.FC = () => {
       <footer className="bg-slate-50 py-8 text-center text-slate-400 text-sm border-t border-slate-200">
         <p className="mb-4">&copy; {new Date().getFullYear()} LunaFlow. Your body, your data.</p>
         <div className="flex justify-center gap-6">
-           <a href="/pages/privacy.html" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</a>
-           <a href="/pages/terms.html" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</a>
+           <Link to="/privacy" className="hover:text-slate-600 hover:underline transition-all">Privacy Policy</Link>
+           <Link to="/terms" className="hover:text-slate-600 hover:underline transition-all">Terms of Service</Link>
         </div>
       </footer>
     </div>
