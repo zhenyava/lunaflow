@@ -6,10 +6,10 @@ export type MigrationFunction = (data: unknown) => unknown;
 /**
  * Migration from v1 (legacy array format) to v2 (versioned object format with DailyRecord schema).
  */
-const migrateV1ToV2: MigrationFunction = (v1Data: unknown) => {
-  const isLegacyFormat = Array.isArray(v1Data) && v1Data.length > 0 && 'type' in v1Data[0];
+const migrateV1ToV2: MigrationFunction = (data: unknown) => {
+  const v1Data = data as (LegacyCalendarEvent | DailyRecord)[];
   
-  if (isLegacyFormat) {
+  if (v1Data.length > 0 && 'type' in v1Data[0]) {
      const map = new Map<string, DailyRecord>();
      const now = Date.now();
      const legacyEvents = v1Data as LegacyCalendarEvent[];
@@ -29,7 +29,8 @@ const migrateV1ToV2: MigrationFunction = (v1Data: unknown) => {
      };
   }
   
-  return { ver: 2, records: Array.isArray(v1Data) ? v1Data : [] };
+  // If it's already an array of DailyRecords (intermediate state), just wrap it
+  return { ver: 2, records: v1Data as DailyRecord[] };
 };
 
 /**
