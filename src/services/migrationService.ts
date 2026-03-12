@@ -30,12 +30,8 @@ const migrateV1ToV2 = (legacyEvents: LegacyCalendarEvent[]) => {
  * Standard migration function for when the schema is backwards compatible 
  * and only the version number needs to be bumped.
  */
-export const migrateVersionNumber = (data: unknown) => {
-  if (data && typeof data === 'object' && 'ver' in data) {
-    const currentVer = (data as Record<string, unknown>).ver as number;
-    return { ...data, ver: currentVer + 1 };
-  }
-  return data;
+export const migrateVersionNumber = (data: { ver: number, records: DailyRecord[] }) => {
+  return { ...data, ver: data.ver + 1 };
 };
 
 /**
