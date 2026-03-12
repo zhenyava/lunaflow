@@ -15,21 +15,15 @@ export interface DailyRecord {
    * If the property exists, it indicates that tracking for periods was recorded.
    */
   period?: {
-    /** True if there was active bleeding/flow on this day. */
-    isFlowing?: boolean;
     /** Optional detail about the flow volume (for future use). */
     intensity?: FlowIntensity;
   };
 
   /** 
    * Data related to ovulation tracking. 
+   * If the property exists, it indicates that ovulation was recorded.
    */
-  ovulation?: {
-    /** Indicates if this ovulation was predicted by an algorithm (not yet fully implemented). */
-    isPredicted?: boolean;
-    /** True if the user manually confirmed ovulation (e.g., via a test kit). */
-    isConfirmed?: boolean;
-  };
+  ovulation?: {};
 
   /** 
    * Unix timestamp (milliseconds) of the last time this record was modified.
@@ -77,10 +71,10 @@ export interface GoogleToken {
 /**
  * Helper to create a DailyRecord with period data.
  */
-export const makePeriodRecord = (date: string, updatedAt = Date.now()): DailyRecord => ({
+export const makePeriodRecord = (date: string, intensity?: FlowIntensity, updatedAt = Date.now()): DailyRecord => ({
   date,
   updatedAt,
-  period: {}
+  period: intensity ? { intensity } : {}
 });
 
 /**

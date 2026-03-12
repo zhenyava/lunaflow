@@ -48,7 +48,7 @@ describe('storageService', () => {
 
     it('should return parsed DailyRecord data directly', () => {
       const mockRecords: DailyRecord[] = [
-        makePeriodRecord('2024-01-01', 12345)
+        makePeriodRecord('2024-01-01', undefined, 12345)
       ];
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockRecords));
 
@@ -92,19 +92,19 @@ describe('storageService', () => {
   describe('mergeEvents', () => {
     it('should prefer the record with the higher updatedAt', () => {
         const local: DailyRecord[] = [
-            makePeriodRecord('2024-01-01', 100), // Older
-            makePeriodRecord('2024-01-02', 300), // Newer
+            makePeriodRecord('2024-01-01', undefined, 100), // Older
+            makePeriodRecord('2024-01-02', undefined, 300), // Newer
         ];
         const remote: DailyRecord[] = [
             { date: '2024-01-01', updatedAt: 200, isDeleted: true }, // Newer, user deleted
-            makePeriodRecord('2024-01-02', 150), // Older
+            makePeriodRecord('2024-01-02', undefined, 150), // Older
         ];
 
         const result = mergeEvents(local, remote);
         
         expect(result).toHaveLength(2);
         expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: 200, isDeleted: true });
-        expect(result[1]).toEqual(makePeriodRecord('2024-01-02', 300));
+        expect(result[1]).toEqual(makePeriodRecord('2024-01-02', undefined, 300));
     });
   });
 });
