@@ -31,13 +31,21 @@ export function useCalendarEvents() {
         const newRecord: DailyRecord = { ...existing, updatedAt: now };
 
         if (activeType === 'period') {
-            newRecord.period = { ...newRecord.period, isFlowing: !newRecord.period?.isFlowing };
+            if (newRecord.period) {
+                delete newRecord.period;
+            } else {
+                newRecord.period = {};
+            }
         } else if (activeType === 'ovulation') {
-            newRecord.ovulation = { ...newRecord.ovulation, isConfirmed: !newRecord.ovulation?.isConfirmed };
+            if (newRecord.ovulation) {
+                delete newRecord.ovulation;
+            } else {
+                newRecord.ovulation = {};
+            }
         }
 
-        const hasPeriod = newRecord.period?.isFlowing;
-        const hasOvulation = newRecord.ovulation?.isConfirmed;
+        const hasPeriod = !!newRecord.period;
+        const hasOvulation = !!newRecord.ovulation;
         
         // If no data left for this day, mark as deleted
         if (!hasPeriod && !hasOvulation) {
@@ -57,9 +65,9 @@ export function useCalendarEvents() {
         };
 
         if (activeType === 'period') {
-          newRecord.period = { isFlowing: true };
+          newRecord.period = {};
         } else if (activeType === 'ovulation') {
-          newRecord.ovulation = { isConfirmed: true };
+          newRecord.ovulation = {};
         }
 
         return [...prev, newRecord].sort((a, b) => a.date.localeCompare(b.date));

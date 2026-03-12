@@ -25,10 +25,10 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   const { periodDates, ovulationDates, predicted, predictedOvulation } = React.useMemo(() => {
     return {
       periodDates: events
-        .filter(e => e.period?.isFlowing)
+        .filter(e => !!e.period)
         .map(e => parseISO(e.date)),
       ovulationDates: events
-        .filter(e => e.ovulation?.isConfirmed)
+        .filter(e => !!e.ovulation)
         .map(e => parseISO(e.date)),
       predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
       predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))

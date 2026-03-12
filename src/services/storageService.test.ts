@@ -34,18 +34,18 @@ describe('storageService', () => {
       expect(result[0]).toEqual({
           date: '2024-01-01',
           updatedAt: Date.now(),
-          period: { isFlowing: true }
+          period: {}
       });
       expect(result[2]).toEqual({
           date: '2024-01-14',
           updatedAt: Date.now(),
-          ovulation: { isConfirmed: true }
+          ovulation: {}
       });
       expect(result[3]).toEqual({
           date: '2024-01-15',
           updatedAt: Date.now(),
-          period: { isFlowing: true },
-          ovulation: { isConfirmed: true }
+          period: {},
+          ovulation: {}
       });
 
       // Should have saved the migrated data
@@ -55,7 +55,7 @@ describe('storageService', () => {
 
     it('should return parsed DailyRecord data directly', () => {
       const mockRecords: DailyRecord[] = [
-        { date: '2024-01-01', updatedAt: 12345, period: { isFlowing: true } }
+        { date: '2024-01-01', updatedAt: 12345, period: {} }
       ];
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockRecords));
 
@@ -99,19 +99,19 @@ describe('storageService', () => {
   describe('mergeEvents', () => {
     it('should prefer the record with the higher updatedAt', () => {
         const local: DailyRecord[] = [
-            { date: '2024-01-01', updatedAt: 100, period: { isFlowing: true } }, // Older
-            { date: '2024-01-02', updatedAt: 300, period: { isFlowing: true } }, // Newer
+            { date: '2024-01-01', updatedAt: 100, period: {} }, // Older
+            { date: '2024-01-02', updatedAt: 300, period: {} }, // Newer
         ];
         const remote: DailyRecord[] = [
             { date: '2024-01-01', updatedAt: 200, isDeleted: true }, // Newer, user deleted
-            { date: '2024-01-02', updatedAt: 150, period: { isFlowing: true } }, // Older
+            { date: '2024-01-02', updatedAt: 150, period: {} }, // Older
         ];
 
         const result = mergeEvents(local, remote);
         
         expect(result).toHaveLength(2);
         expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: 200, isDeleted: true });
-        expect(result[1]).toEqual({ date: '2024-01-02', updatedAt: 300, period: { isFlowing: true } });
+        expect(result[1]).toEqual({ date: '2024-01-02', updatedAt: 300, period: {} });
     });
   });
 });

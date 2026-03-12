@@ -16,7 +16,7 @@ export interface DailyRecord {
    */
   period?: {
     /** True if there was active bleeding/flow on this day. */
-    isFlowing: boolean;
+    isFlowing?: boolean;
     /** Optional detail about the flow volume (for future use). */
     intensity?: FlowIntensity;
   };

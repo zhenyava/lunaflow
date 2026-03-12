@@ -16,9 +16,9 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
     }
 
     if (event.type === 'period') {
-      record.period = { isFlowing: true };
+      record.period = {};
     } else if (event.type === 'ovulation') {
-      record.ovulation = { isConfirmed: true };
+      record.ovulation = {};
     }
   });
 

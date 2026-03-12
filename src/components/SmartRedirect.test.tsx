@@ -12,8 +12,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => mockNavigate,
-  };
+    useNavigate: () => mockNavigate};
 });
 
 // Mock LandingPage
@@ -59,7 +58,7 @@ describe('SmartRedirect', () => {
   it('redirects to /calendar if user has local events', () => {
     vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{
       date: '2023-01-01',
-      updatedAt: Date.now(), period: { isFlowing: true }
+      updatedAt: Date.now(), period: {}
     }]);
 
     renderComponent();
