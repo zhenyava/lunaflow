@@ -67,6 +67,14 @@ export interface GoogleToken {
   expires_at?: number; // Calculated expiration timestamp
 }
 
+/**
+ * Container for the versioned storage format.
+ */
+export interface StoredDataV2 {
+  ver: 2;
+  records: DailyRecord[];
+}
+
 
 /**
  * Helper to create a DailyRecord with period data.

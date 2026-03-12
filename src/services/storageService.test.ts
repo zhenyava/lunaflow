@@ -18,7 +18,7 @@ describe('storageService', () => {
         vi.restoreAllMocks();
     });
 
-    it('should migrate legacy events to DailyRecord', () => {
+    it('should migrate legacy events to DailyRecord and wrap in version 2', () => {
       const legacyEvents: LegacyCalendarEvent[] = [
         { date: '2024-01-01', type: 'period' },
         { date: '2024-01-02', type: 'period' },
@@ -41,12 +41,25 @@ describe('storageService', () => {
           ovulation: {}
       });
 
-      // Should have saved the migrated data
-      const savedData = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '[]');
-      expect(savedData).toEqual(result);
+      // Should have saved the migrated data in versioned format
+      const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+      expect(savedRaw.ver).toBe(2);
+      expect(savedRaw.records).toEqual(result);
     });
 
-    it('should return parsed DailyRecord data directly', () => {
+    it('should return records from versioned storage format', () => {
+      const mockRecords: DailyRecord[] = [
+        makePeriodRecord('2024-01-01')
+      ];
+      const versionedData = { ver: 2, records: mockRecords };
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(versionedData));
+
+      const result = getLocalEvents();
+
+      expect(result).toEqual(mockRecords);
+    });
+
+    it('should handle raw DailyRecord array by migrating it to versioned format', () => {
       const mockRecords: DailyRecord[] = [
         makePeriodRecord('2024-01-01')
       ];
@@ -55,6 +68,10 @@ describe('storageService', () => {
       const result = getLocalEvents();
 
       expect(result).toEqual(mockRecords);
+      
+      const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
+      expect(savedRaw.ver).toBe(2);
+      expect(savedRaw.records).toEqual(mockRecords);
     });
 
     it('should return an empty array when localStorage returns null (no data)', () => {

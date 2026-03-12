@@ -1,5 +1,6 @@
-import type { DailyRecord, LegacyCalendarEvent } from '../types';
+import type { DailyRecord, LegacyCalendarEvent, StoredDataV2 } from '../types';
 import { LOCAL_STORAGE_KEY } from '../constants';
+import { makeEmptyRecord } from '../types';
 
 const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord[] => {
   const map = new Map<string, DailyRecord>();
@@ -8,10 +9,7 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
   legacyEvents.forEach(event => {
     let record = map.get(event.date);
     if (!record) {
-      record = {
-        date: event.date,
-        updatedAt: now,
-      };
+      record = makeEmptyRecord(event.date, now);
       map.set(event.date, record);
     }
 
@@ -27,7 +25,8 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
 
 export const saveLocalEvents = (events: DailyRecord[]) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(events));
+    const data: StoredDataV2 = { ver: 2, records: events };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error('Failed to save to local storage', e);
   }
@@ -39,16 +38,27 @@ export const getLocalEvents = (): DailyRecord[] => {
     if (!data) return [];
 
     const parsed = JSON.parse(data);
-    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+    
+    // 1. Check if it's the NEW versioned format { ver, records }
+    if (parsed && typeof parsed === 'object' && 'ver' in parsed && 'records' in parsed) {
+      return (parsed as StoredDataV2).records;
+    }
 
-    // Check if it's legacy data
-    if ('type' in parsed[0]) {
-      const migrated = migrateToDailyRecords(parsed as LegacyCalendarEvent[]);
-      saveLocalEvents(migrated); // Save the migrated data back immediately
+    // 2. Handle intermediate or legacy array formats
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      // Is it the legacy format [ { date, type }, ... ]?
+      if ('type' in parsed[0]) {
+        const migrated = migrateToDailyRecords(parsed as LegacyCalendarEvent[]);
+        saveLocalEvents(migrated); // Auto-migrate to versioned format
+        return migrated;
+      }
+      // Or just a raw array [ DailyRecord, ... ]?
+      const migrated = parsed as DailyRecord[];
+      saveLocalEvents(migrated); // Auto-migrate to versioned format
       return migrated;
     }
 
-    return parsed as DailyRecord[];
+    return [];
   } catch (e) {
     console.error('Failed to load from local storage', e);
     return [];

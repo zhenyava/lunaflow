@@ -1,4 +1,4 @@
-import type { DailyRecord, GoogleToken } from '../types';
+import type { DailyRecord, GoogleToken, StoredDataV2 } from '../types';
 import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
@@ -220,7 +220,8 @@ export const ensureDriveFileExists = async (): Promise<string> => {
       mimeType: 'application/json'
     };
 
-    const initialContent = JSON.stringify([]);
+    const initialData: StoredDataV2 = { ver: 2, records: [] };
+    const initialContent = JSON.stringify(initialData);
     const file = new Blob([initialContent], { type: 'application/json' });
 
     const accessToken = token.access_token;
@@ -257,7 +258,8 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
   const token = window.gapi.client.getToken();
   if (!token) throw new Error("No token for upload");
 
-  const fileContent = JSON.stringify(events);
+  const data: StoredDataV2 = { ver: 2, records: events };
+  const fileContent = JSON.stringify(data);
   const accessToken = token.access_token;
   
   try {
@@ -288,7 +290,19 @@ export const fetchDriveDataContent = async (fileId: string): Promise<DailyRecord
             fileId: fileId,
             alt: 'media'
         });
-        return fileResponse.result as DailyRecord[];
+        const parsed = fileResponse.result;
+
+        // Handle versioned format { ver: 2, records: [] }
+        if (parsed && typeof parsed === 'object' && 'ver' in parsed && 'records' in parsed) {
+            return (parsed as StoredDataV2).records;
+        }
+
+        // Handle legacy array format [ DailyRecord, ... ]
+        if (Array.isArray(parsed)) {
+            return parsed as DailyRecord[];
+        }
+
+        return [];
     } catch (error) {
         console.error("Fetch Content Error", error);
         throw error;
