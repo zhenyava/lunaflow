@@ -5,32 +5,26 @@ export type MigrationFunction = (data: unknown) => unknown;
 
 /**
  * Migration from v1 (legacy array format) to v2 (versioned object format with DailyRecord schema).
+ * V1 is strictly defined as LegacyCalendarEvent[].
  */
 const migrateV1ToV2: MigrationFunction = (data: unknown) => {
-  const v1Data = data as (LegacyCalendarEvent | DailyRecord)[];
+  const legacyEvents = data as LegacyCalendarEvent[];
+  const map = new Map<string, DailyRecord>();
+  const now = Date.now();
   
-  if (v1Data.length > 0 && 'type' in v1Data[0]) {
-     const map = new Map<string, DailyRecord>();
-     const now = Date.now();
-     const legacyEvents = v1Data as LegacyCalendarEvent[];
-     
-     legacyEvents.forEach(event => {
-       if (!map.has(event.date)) {
-         map.set(
-           event.date, 
-           event.type === 'period' ? makePeriodRecord(event.date, now) : makeOvulationRecord(event.date, now)
-         );
-       }
-     });
-     
-     return {
-       ver: 2,
-       records: Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
-     };
-  }
+  legacyEvents.forEach(event => {
+    if (!map.has(event.date)) {
+      map.set(
+        event.date, 
+        event.type === 'period' ? makePeriodRecord(event.date, now) : makeOvulationRecord(event.date, now)
+      );
+    }
+  });
   
-  // If it's already an array of DailyRecords (intermediate state), just wrap it
-  return { ver: 2, records: v1Data as DailyRecord[] };
+  return {
+    ver: 2,
+    records: Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
+  };
 };
 
 /**

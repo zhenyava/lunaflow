@@ -51,21 +51,6 @@ describe('storageService', () => {
       expect(result).toEqual(mockRecords);
     });
 
-    it('should handle raw DailyRecord array by migrating it to versioned format', () => {
-      const mockRecords: DailyRecord[] = [
-        makePeriodRecord('2024-01-01')
-      ];
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockRecords));
-
-      const result = getLocalEvents();
-
-      expect(result).toEqual(mockRecords);
-      
-      const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-      expect(savedRaw.ver).toBe(2);
-      expect(savedRaw.records).toEqual(mockRecords);
-    });
-
     it('should return an empty array when localStorage returns null (no data)', () => {
       const result = getLocalEvents();
       expect(result).toEqual([]);
