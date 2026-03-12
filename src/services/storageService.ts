@@ -27,8 +27,8 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
       migratedData = migrateFn(migratedData);
       currentVer++;
     } else {
-       // Failsafe if a migration step is missing
-       break; 
+      // Failsafe if a migration step is missing
+      break;
     }
   }
 
@@ -37,28 +37,20 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
   // Final validation to ensure the output matches the expected standard format
   const finalData = migratedData as Record<string, unknown>;
   if (
-      finalData && 
-      typeof finalData === 'object' && 
-      finalData.ver === STORAGE_CURRENT_VERSION && 
-      Array.isArray(finalData.records)
+    finalData &&
+    typeof finalData === 'object' &&
+    finalData.ver === STORAGE_CURRENT_VERSION &&
+    Array.isArray(finalData.records)
   ) {
-       return { records: finalData.records as DailyRecord[], wasMigrated };
+    return { records: finalData.records as DailyRecord[], wasMigrated };
   }
 
   return { records: [], wasMigrated: false };
 };
 
-/**
- * Helper to wrap standard DailyRecord array into the versioned storage envelope.
- */
-export const prepareDataForStorage = (records: DailyRecord[]) => {
-   return { ver: STORAGE_CURRENT_VERSION, records };
-};
-
 export const saveLocalEvents = (events: DailyRecord[]) => {
   try {
-    const data = prepareDataForStorage(events);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ver: STORAGE_CURRENT_VERSION, events }));
   } catch (e) {
     console.error('Failed to save to local storage', e);
   }
@@ -73,7 +65,7 @@ export const getLocalEvents = (): DailyRecord[] => {
     const { records, wasMigrated } = parseAndMigrateData(parsed);
 
     if (wasMigrated) {
-        saveLocalEvents(records);
+      saveLocalEvents(records);
     }
 
     return records;
@@ -85,12 +77,12 @@ export const getLocalEvents = (): DailyRecord[] => {
 
 export const mergeEvents = (local: DailyRecord[], remote: DailyRecord[]): DailyRecord[] => {
   const map = new Map<string, DailyRecord>();
-  
+
   const allRecords = [...local, ...remote];
 
   for (const record of allRecords) {
     const existing = map.get(record.date);
-    
+
     // If the record doesn't exist yet, or the current one is newer
     if (!existing || record.updatedAt > existing.updatedAt) {
       map.set(record.date, record);
