@@ -10,6 +10,7 @@ import {
   restoreGapiSession
 } from '../services/googleService';
 import { mergeEvents, saveLocalEvents } from '../services/storageService';
+import { parseAndMigrateData } from '../services/migrationService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
@@ -65,7 +66,8 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     if (!fileId) return;
     setSyncState({ status: 'syncing' });
     try {
-        const remoteEvents = await fetchDriveDataContent(fileId);
+        const rawRemoteData = await fetchDriveDataContent(fileId);
+        const remoteEvents = parseAndMigrateData(rawRemoteData);
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         

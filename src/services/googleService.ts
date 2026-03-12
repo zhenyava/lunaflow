@@ -1,5 +1,6 @@
 import type { DailyRecord, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME, STORAGE_CURRENT_VERSION } from '../constants';
+import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
+import { prepareDataForStorage } from './migrationService';
 
 // Declare global types for GAPI and Google Identity Services
 interface TokenClient {
@@ -220,7 +221,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
       mimeType: 'application/json'
     };
 
-    const initialData = { ver: STORAGE_CURRENT_VERSION, records: [] as DailyRecord[] };
+    const initialData = prepareDataForStorage([]);
     const initialContent = JSON.stringify(initialData);
     const file = new Blob([initialContent], { type: 'application/json' });
 
@@ -258,7 +259,7 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
   const token = window.gapi.client.getToken();
   if (!token) throw new Error("No token for upload");
 
-  const data = { ver: STORAGE_CURRENT_VERSION, records: events };
+  const data = prepareDataForStorage(events);
   const fileContent = JSON.stringify(data);
   const accessToken = token.access_token;
   
@@ -284,31 +285,13 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
   }
 };
 
-export const fetchDriveDataContent = async (fileId: string): Promise<DailyRecord[]> => {
+export const fetchDriveDataContent = async (fileId: string): Promise<unknown> => {
     try {
         const fileResponse = await window.gapi.client.drive.files.get({
             fileId: fileId,
             alt: 'media'
         });
-        const parsed = fileResponse.result as Record<string, unknown> | DailyRecord[];
-
-        // Handle versioned format { ver: 2, records: [] }
-        if (
-            parsed && 
-            !Array.isArray(parsed) && 
-            typeof parsed === 'object' && 
-            parsed.ver === STORAGE_CURRENT_VERSION && 
-            Array.isArray(parsed.records)
-        ) {
-            return parsed.records as DailyRecord[];
-        }
-
-        // Handle legacy array format [ DailyRecord, ... ]
-        if (Array.isArray(parsed)) {
-            return parsed as DailyRecord[];
-        }
-
-        return [];
+        return fileResponse.result; // Returns raw parsed JSON, parsing and migration handled by caller
     } catch (error) {
         console.error("Fetch Content Error", error);
         throw error;
