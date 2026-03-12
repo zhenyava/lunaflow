@@ -31,17 +31,9 @@ export function useCalendarEvents() {
         const newRecord: DailyRecord = { ...existing, updatedAt: now };
 
         if (activeType === 'period') {
-            if (newRecord.period?.isFlowing) {
-                newRecord.period = { ...newRecord.period, isFlowing: false };
-            } else {
-                newRecord.period = { ...newRecord.period, isFlowing: true };
-            }
+            newRecord.period = { ...newRecord.period, isFlowing: !newRecord.period?.isFlowing };
         } else if (activeType === 'ovulation') {
-            if (newRecord.ovulation?.isConfirmed) {
-                newRecord.ovulation = { ...newRecord.ovulation, isConfirmed: false };
-            } else {
-                newRecord.ovulation = { ...newRecord.ovulation, isConfirmed: true };
-            }
+            newRecord.ovulation = { ...newRecord.ovulation, isConfirmed: !newRecord.ovulation?.isConfirmed };
         }
 
         const hasPeriod = newRecord.period?.isFlowing;

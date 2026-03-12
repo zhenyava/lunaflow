@@ -75,6 +75,24 @@ describe('storageService', () => {
       const result = getLocalEvents();
       expect(result).toEqual([]);
       expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', expect.any(SyntaxError));
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should return an empty array and log error when localStorage.getItem throws an error', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const mockError = new Error('Access to localStorage denied');
+      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw mockError;
+      });
+
+      const result = getLocalEvents();
+
+      expect(result).toEqual([]);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', mockError);
+      
+      getItemSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
     });
   });
 

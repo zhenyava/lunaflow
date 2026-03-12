@@ -14,19 +14,14 @@ import { GOOGLE_CLIENT_ID } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const eventA = a[i];
-    const eventB = b[i];
+  if (a.length === 0 && b.length === 0) return true;
 
-    if (
-      eventA.date !== eventB.date || 
-      eventA.updatedAt !== eventB.updatedAt || 
-      eventA.isDeleted !== eventB.isDeleted
-    ) {
-      return false;
-    }
-  }
-  return true;
+  // Sort by date to ensure order, then stringify for a deep comparison.
+  const sortFn = (x: DailyRecord, y: DailyRecord) => x.date.localeCompare(y.date);
+  const stringA = JSON.stringify([...a].sort(sortFn));
+  const stringB = JSON.stringify([...b].sort(sortFn));
+
+  return stringA === stringB;
 }
 
 interface UseGoogleSyncProps {

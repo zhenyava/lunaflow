@@ -65,7 +65,7 @@ export const mergeEvents = (local: DailyRecord[], remote: DailyRecord[]): DailyR
     
     // If the record doesn't exist yet, or the current one is newer
     if (!existing || record.updatedAt > existing.updatedAt) {
-      map.set(record.date, { ...record }); // Deep clone or spread is safe enough for this level
+      map.set(record.date, JSON.parse(JSON.stringify(record))); // Use a deep copy for safety
     }
   }
 

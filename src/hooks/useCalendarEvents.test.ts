@@ -22,7 +22,7 @@ describe('useCalendarEvents', () => {
   });
 
   it('should initialize with events from local storage', () => {
-    const mockEvents: DailyRecord[] = [{ date: '2024-03-01', updatedAt: 123, period: { isFlowing: true } }];
+    const mockEvents: DailyRecord[] = [{ date: '2024-03-01', updatedAt: Date.now(), period: { isFlowing: true } }];
     vi.mocked(storageService.getLocalEvents).mockReturnValue(mockEvents);
 
     const { result } = renderHook(() => useCalendarEvents());
