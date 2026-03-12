@@ -67,7 +67,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     setSyncState({ status: 'syncing' });
     try {
         const rawRemoteData = await fetchDriveDataContent(fileId);
-        const remoteEvents = parseAndMigrateData(rawRemoteData);
+        const { records: remoteEvents } = parseAndMigrateData(rawRemoteData);
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         

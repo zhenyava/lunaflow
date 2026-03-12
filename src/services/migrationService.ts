@@ -54,8 +54,8 @@ const migrations: MigrationFunction[] = [
  * It determines the current version of the data and runs it through the
  * migration pipeline sequentially until it reaches the STORAGE_CURRENT_VERSION.
  */
-export const parseAndMigrateData = (parsedData: unknown): DailyRecord[] => {
-  if (!parsedData) return [];
+export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord[], wasMigrated: boolean } => {
+  if (!parsedData) return { records: [], wasMigrated: false };
 
   // Determine current version of the data
   // Legacy arrays are considered v1.
@@ -64,6 +64,7 @@ export const parseAndMigrateData = (parsedData: unknown): DailyRecord[] => {
     currentVer = (parsedData as Record<string, unknown>).ver as number;
   }
 
+  const initialVer = currentVer;
   let migratedData: unknown = parsedData;
 
   // Run migrations sequentially
@@ -78,6 +79,8 @@ export const parseAndMigrateData = (parsedData: unknown): DailyRecord[] => {
     }
   }
 
+  const wasMigrated = initialVer < currentVer;
+
   // Final validation to ensure the output matches the expected standard format
   const finalData = migratedData as Record<string, unknown>;
   if (
@@ -86,10 +89,10 @@ export const parseAndMigrateData = (parsedData: unknown): DailyRecord[] => {
       finalData.ver === STORAGE_CURRENT_VERSION && 
       Array.isArray(finalData.records)
   ) {
-       return finalData.records as DailyRecord[];
+       return { records: finalData.records as DailyRecord[], wasMigrated };
   }
 
-  return [];
+  return { records: [], wasMigrated: false };
 };
 
 /**

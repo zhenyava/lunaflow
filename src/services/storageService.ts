@@ -1,5 +1,5 @@
 import type { DailyRecord } from '../types';
-import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { LOCAL_STORAGE_KEY } from '../constants';
 import { parseAndMigrateData, prepareDataForStorage } from './migrationService';
 
 export const saveLocalEvents = (events: DailyRecord[]) => {
@@ -17,12 +17,9 @@ export const getLocalEvents = (): DailyRecord[] => {
     if (!data) return [];
 
     const parsed = JSON.parse(data);
-    const records = parseAndMigrateData(parsed);
+    const { records, wasMigrated } = parseAndMigrateData(parsed);
 
-    // Naive check: if it wasn't already in the exact current version format,
-    // it means a migration happened (or it was empty), so we should auto-save the migrated state.
-    const isFirstVersion = Array.isArray(parsed) && parsed.length > 0;
-    if (isFirstVersion || (parsed && typeof parsed === 'object' && parsed.ver !== STORAGE_CURRENT_VERSION)) {
+    if (wasMigrated) {
         saveLocalEvents(records);
     }
 
