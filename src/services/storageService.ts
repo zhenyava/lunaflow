@@ -1,4 +1,4 @@
-import type { DailyRecord } from '../types';
+import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
 import { migrations } from './migrationService';
 
@@ -11,15 +11,16 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
   if (!parsedData) return { records: [], wasMigrated: false };
 
   let currentVer = 1;
-  let records: unknown[];
+  let records: LegacyCalendarEvent[] | DailyRecord[];
 
   // 1. Determine version and extract records array
   if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData) && 'ver' in parsedData) {
-    currentVer = (parsedData as Record<string, unknown>).ver as number;
-    records = (parsedData as Record<string, unknown>).records as unknown[];
+    const dataObj = parsedData as Record<string, unknown>;
+    currentVer = dataObj.ver as number;
+    records = dataObj.records as DailyRecord[];
   } else if (Array.isArray(parsedData)) {
     currentVer = 1;
-    records = parsedData as unknown[];
+    records = parsedData as LegacyCalendarEvent[];
   } else {
     // Unknown or invalid format
     return { records: [], wasMigrated: false };
@@ -31,7 +32,8 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
   while (currentVer < STORAGE_CURRENT_VERSION && currentVer < migrations.length) {
     const migrateFn = migrations[currentVer];
     if (migrateFn) {
-      records = migrateFn(records) as unknown[];
+      // After the first migration (v1 -> v2), records will always be DailyRecord[]
+      records = migrateFn(records) as DailyRecord[];
       currentVer++;
     } else {
       break;
