@@ -48,9 +48,14 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
   return { records: [], wasMigrated: false };
 };
 
+export const prepareDataForStorage = (records: DailyRecord[]) => {
+   return { ver: STORAGE_CURRENT_VERSION, records };
+};
+
 export const saveLocalEvents = (events: DailyRecord[]) => {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ ver: STORAGE_CURRENT_VERSION, events }));
+    const data = prepareDataForStorage(events);
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error('Failed to save to local storage', e);
   }

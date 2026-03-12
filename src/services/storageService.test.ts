@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getLocalEvents, mergeEvents } from './storageService';
-import { LOCAL_STORAGE_KEY } from '../constants';
+import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { migrations } from './migrationService';
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
 describe('storageService', () => {
+  describe('Migration Pipeline Registry', () => {
+    it('should have a registered migration for every version bump up to STORAGE_CURRENT_VERSION', () => {
+      // Index 0 is a placeholder, so valid migrations start at index 1.
+      // If STORAGE_CURRENT_VERSION is 2, migrations array should have 2 elements (0 and 1).
+      // If STORAGE_CURRENT_VERSION is 3, migrations array should have 3 elements (0, 1, 2).
+      expect(migrations.length).toBe(STORAGE_CURRENT_VERSION);
+    });
+  });
+
   describe('getLocalEvents & Migration', () => {
     beforeEach(() => {
       localStorage.clear();
