@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
 import * as storageService from '../services/storageService';
 import type { DailyRecord } from '../types';
+import { makePeriodRecord } from '../types';
 
 // Mock the storage service
 vi.mock('../services/storageService', () => ({
@@ -21,7 +22,7 @@ describe('useCalendarEvents', () => {
   });
 
   it('should initialize with events from local storage', () => {
-    const mockEvents: DailyRecord[] = [{ date: '2024-03-01', updatedAt: Date.now(), period: {} }];
+    const mockEvents: DailyRecord[] = [makePeriodRecord('2024-03-01')];
     vi.mocked(storageService.getLocalEvents).mockReturnValue(mockEvents);
 
     const { result } = renderHook(() => useCalendarEvents());
@@ -53,7 +54,7 @@ describe('useCalendarEvents', () => {
   describe('handleDayClick logic', () => {
     it('should add a new event when date is empty', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', updatedAt: 100, period: {} }
+        makePeriodRecord('2024-03-01', 100)
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -67,7 +68,7 @@ describe('useCalendarEvents', () => {
       });
 
       const expected = [
-        { date: '2024-03-01', updatedAt: 100, period: {} },
+        makePeriodRecord('2024-03-01', 100),
         { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} }
       ];
       expect(result.current.events).toEqual(expected);
@@ -76,7 +77,7 @@ describe('useCalendarEvents', () => {
 
     it('should update event type when clicking existing date with different activeType', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', updatedAt: 100, period: {} }
+        makePeriodRecord('2024-03-01', 100)
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -98,7 +99,7 @@ describe('useCalendarEvents', () => {
 
     it('should mark event as deleted and filter it from events when un-toggling', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', updatedAt: 100, period: {} }
+        makePeriodRecord('2024-03-01', 100)
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 

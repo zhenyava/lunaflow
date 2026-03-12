@@ -1,3 +1,4 @@
+import { makePeriodRecord } from '../types';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
 import SmartRedirect from './SmartRedirect';
@@ -56,10 +57,7 @@ describe('SmartRedirect', () => {
   });
 
   it('redirects to /calendar if user has local events', () => {
-    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{
-      date: '2023-01-01',
-      updatedAt: Date.now(), period: {}
-    }]);
+    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([makePeriodRecord('2023-01-01')]);
 
     renderComponent();
 

@@ -72,3 +72,30 @@ export interface GoogleToken {
   token_type: string;
   expires_at?: number; // Calculated expiration timestamp
 }
+
+
+/**
+ * Helper to create a DailyRecord with period data.
+ */
+export const makePeriodRecord = (date: string, updatedAt = Date.now()): DailyRecord => ({
+  date,
+  updatedAt,
+  period: {}
+});
+
+/**
+ * Helper to create a DailyRecord with ovulation data.
+ */
+export const makeOvulationRecord = (date: string, updatedAt = Date.now()): DailyRecord => ({
+  date,
+  updatedAt,
+  ovulation: {}
+});
+
+/**
+ * Helper to create an empty DailyRecord.
+ */
+export const makeEmptyRecord = (date: string, updatedAt = Date.now()): DailyRecord => ({
+  date,
+  updatedAt
+});

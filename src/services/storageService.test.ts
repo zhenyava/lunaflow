@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getLocalEvents, mergeEvents } from './storageService';
 import { LOCAL_STORAGE_KEY } from '../constants';
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
+import { makePeriodRecord, makeOvulationRecord } from '../types';
 
 describe('storageService', () => {
   describe('getLocalEvents & Migration', () => {
@@ -31,16 +32,8 @@ describe('storageService', () => {
       const result = getLocalEvents();
 
       expect(result).toHaveLength(4);
-      expect(result[0]).toEqual({
-          date: '2024-01-01',
-          updatedAt: Date.now(),
-          period: {}
-      });
-      expect(result[2]).toEqual({
-          date: '2024-01-14',
-          updatedAt: Date.now(),
-          ovulation: {}
-      });
+      expect(result[0]).toEqual(makePeriodRecord('2024-01-01'));
+      expect(result[2]).toEqual(makeOvulationRecord('2024-01-14'));
       expect(result[3]).toEqual({
           date: '2024-01-15',
           updatedAt: Date.now(),
@@ -55,7 +48,7 @@ describe('storageService', () => {
 
     it('should return parsed DailyRecord data directly', () => {
       const mockRecords: DailyRecord[] = [
-        { date: '2024-01-01', updatedAt: 12345, period: {} }
+        makePeriodRecord('2024-01-01', 12345)
       ];
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mockRecords));
 
@@ -99,19 +92,19 @@ describe('storageService', () => {
   describe('mergeEvents', () => {
     it('should prefer the record with the higher updatedAt', () => {
         const local: DailyRecord[] = [
-            { date: '2024-01-01', updatedAt: 100, period: {} }, // Older
-            { date: '2024-01-02', updatedAt: 300, period: {} }, // Newer
+            makePeriodRecord('2024-01-01', 100), // Older
+            makePeriodRecord('2024-01-02', 300), // Newer
         ];
         const remote: DailyRecord[] = [
             { date: '2024-01-01', updatedAt: 200, isDeleted: true }, // Newer, user deleted
-            { date: '2024-01-02', updatedAt: 150, period: {} }, // Older
+            makePeriodRecord('2024-01-02', 150), // Older
         ];
 
         const result = mergeEvents(local, remote);
         
         expect(result).toHaveLength(2);
         expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: 200, isDeleted: true });
-        expect(result[1]).toEqual({ date: '2024-01-02', updatedAt: 300, period: {} });
+        expect(result[1]).toEqual(makePeriodRecord('2024-01-02', 300));
     });
   });
 });
