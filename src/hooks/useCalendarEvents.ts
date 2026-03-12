@@ -1,22 +1,29 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { DailyRecord, EventType } from '../types';
 import { getLocalEvents, saveLocalEvents } from '../services/storageService';
 
 export function useCalendarEvents() {
-  const [events, setEvents] = useState<DailyRecord[]>(() => getLocalEvents());
+  // Internal state holds ALL records, including those marked as isDeleted (tombstones)
+  const [records, setRecords] = useState<DailyRecord[]>(() => getLocalEvents());
   const [activeType, setActiveType] = useState<EventType>('period');
 
-  // Save to Local Storage immediately when events change
+  // Save to Local Storage immediately when records change
   useEffect(() => {
-    saveLocalEvents(events);
-  }, [events]);
+    saveLocalEvents(records);
+  }, [records]);
+
+  // Derived state: only records that are NOT deleted. 
+  // This is what the UI and business logic (stats) will use.
+  const activeEvents = useMemo(() => {
+    return records.filter(r => !r.isDeleted);
+  }, [records]);
 
   const handleDayClick = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const now = Date.now();
 
-    setEvents(prev => {
+    setRecords(prev => {
       const existingIdx = prev.findIndex(e => e.date === dateStr);
       const existing = existingIdx >= 0 ? prev[existingIdx] : null;
 
@@ -40,15 +47,16 @@ export function useCalendarEvents() {
         const hasPeriod = newRecord.period?.isFlowing;
         const hasOvulation = newRecord.ovulation?.isConfirmed;
         
+        // If no data left for this day, mark as deleted
         if (!hasPeriod && !hasOvulation) {
             newRecord.isDeleted = true;
         } else {
             newRecord.isDeleted = false;
         }
 
-        const newEvents = [...prev];
-        newEvents[existingIdx] = newRecord;
-        return newEvents;
+        const newRecords = [...prev];
+        newRecords[existingIdx] = newRecord;
+        return newRecords;
       } else {
         const newRecord: DailyRecord = {
           date: dateStr,
@@ -68,8 +76,9 @@ export function useCalendarEvents() {
   }, [activeType]);
 
   return {
-    events,
-    setEvents,
+    events: activeEvents,    // Clean events for UI
+    allRecords: records,     // Raw records for Sync
+    setEvents: setRecords,   // Updater for Sync
     activeType,
     setActiveType,
     handleDayClick

@@ -6,7 +6,7 @@ import type { DailyRecord, EventType } from '../types';
  */
 const getClusters = (events: DailyRecord[], type: EventType) => {
   const filteredEvents = events
-    .filter(e => !e.isDeleted && (type === 'period' ? e.period?.isFlowing : e.ovulation?.isConfirmed))
+    .filter(e => (type === 'period' ? e.period?.isFlowing : e.ovulation?.isConfirmed))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (filteredEvents.length === 0) return [];

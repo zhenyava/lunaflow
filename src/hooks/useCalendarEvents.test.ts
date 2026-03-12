@@ -28,10 +28,11 @@ describe('useCalendarEvents', () => {
     const { result } = renderHook(() => useCalendarEvents());
 
     expect(result.current.events).toEqual(mockEvents);
+    expect(result.current.allRecords).toEqual(mockEvents);
     expect(storageService.getLocalEvents).toHaveBeenCalledOnce();
   });
 
-  it('should save to local storage when events change', () => {
+  it('should save to local storage (allRecords) when events change', () => {
     vi.mocked(storageService.getLocalEvents).mockReturnValue([]);
 
     const { result } = renderHook(() => useCalendarEvents());
@@ -44,6 +45,7 @@ describe('useCalendarEvents', () => {
       result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
     });
 
+    // saveLocalEvents should be called with the full record list
     expect(storageService.saveLocalEvents).toHaveBeenCalledWith([
       { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: { isFlowing: true } }
     ]);
@@ -65,10 +67,12 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-05T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
+      const expected = [
         { date: '2024-03-01', updatedAt: 100, period: { isFlowing: true } },
         { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: { isConfirmed: true } }
-      ]);
+      ];
+      expect(result.current.events).toEqual(expected);
+      expect(result.current.allRecords).toEqual(expected);
     });
 
     it('should update event type when clicking existing date with different activeType', () => {
@@ -86,19 +90,20 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
+      const expected = [
         { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: { isFlowing: true }, ovulation: { isConfirmed: true } }
-      ]);
+      ];
+      expect(result.current.events).toEqual(expected);
+      expect(result.current.allRecords).toEqual(expected);
     });
 
-    it('should mark event as deleted when un-toggling the only active type', () => {
+    it('should mark event as deleted and filter it from events when un-toggling', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
         { date: '2024-03-01', updatedAt: 100, period: { isFlowing: true } }
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
       act(() => {
-        // Defaults to 'period', but setting explicitly to be sure
         result.current.setActiveType('period');
       });
 
@@ -107,7 +112,11 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
+      // UI 'events' should be empty
+      expect(result.current.events).toEqual([]);
+
+      // 'allRecords' should contain the tombstone
+      expect(result.current.allRecords).toEqual([
         { date: '2024-03-01', updatedAt: Date.now(), isDeleted: true, period: { isFlowing: false } }
       ]);
     });
