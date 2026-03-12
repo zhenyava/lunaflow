@@ -1,7 +1,7 @@
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
-export type MigrationFunction = (data: unknown) => unknown;
+export type MigrationFunction = (data: unknown) => DailyRecord[];
 
 /**
  * Migration from v1 (legacy array format) to v2 (DailyRecord schema).
@@ -37,6 +37,6 @@ export const migrateVersionNumber = (records: DailyRecord[]): DailyRecord[] => {
  * The index in the array matches the version number the data is migrating FROM.
  */
 export const migrations: MigrationFunction[] = [
-  (data) => data, // Index 0 (unused)
+  () => [] as DailyRecord[], // Index 0 (unused)
   migrateV1ToV2 as MigrationFunction,  // Index 1: v1 -> v2
 ];
