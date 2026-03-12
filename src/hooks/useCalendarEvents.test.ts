@@ -8,7 +8,8 @@ import { makePeriodRecord } from '../types';
 // Mock the storage service
 vi.mock('../services/storageService', () => ({
   getLocalEvents: vi.fn(),
-  saveLocalEvents: vi.fn()}));
+  saveLocalEvents: vi.fn(),
+}));
 
 describe('useCalendarEvents', () => {
   beforeEach(() => {
@@ -54,7 +55,7 @@ describe('useCalendarEvents', () => {
   describe('handleDayClick logic', () => {
     it('should add a new event when date is empty', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        makePeriodRecord('2024-03-01', undefined, 100)
+        makePeriodRecord('2024-03-01', undefined, Date.now())
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -68,7 +69,7 @@ describe('useCalendarEvents', () => {
       });
 
       const expected = [
-        makePeriodRecord('2024-03-01', undefined, 100),
+        makePeriodRecord('2024-03-01', undefined, Date.now()),
         { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} }
       ];
       expect(result.current.events).toEqual(expected);
@@ -77,7 +78,7 @@ describe('useCalendarEvents', () => {
 
     it('should update event type when clicking existing date with different activeType', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        makePeriodRecord('2024-03-01', undefined, 100)
+        makePeriodRecord('2024-03-01', undefined, Date.now())
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -99,7 +100,7 @@ describe('useCalendarEvents', () => {
 
     it('should mark event as deleted and filter it from events when un-toggling', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        makePeriodRecord('2024-03-01', undefined, 100)
+        makePeriodRecord('2024-03-01', undefined, Date.now())
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -117,7 +118,7 @@ describe('useCalendarEvents', () => {
 
       // 'allRecords' should contain the tombstone
       expect(result.current.allRecords).toEqual([
-        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: true}
+        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: true }
       ]);
     });
   });
