@@ -37,7 +37,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
 
   const handleLogin = async () => {
     try {
-      // @ts-ignore - Clerk v5 authenticateWithRedirect exists on LoadedClerk
+      // @ts-expect-error - Clerk v5 authenticateWithRedirect exists on LoadedClerk
       await clerk.authenticateWithRedirect({
         strategy: 'oauth_google',
         redirectUrl: '/calendar',
