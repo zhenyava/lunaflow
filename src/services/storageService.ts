@@ -10,42 +10,40 @@ import { migrations } from './migrationService';
 export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord[], wasMigrated: boolean } => {
   if (!parsedData) return { records: [], wasMigrated: false };
 
-  // Determine current version of the data
-  // Legacy arrays are considered v1.
   let currentVer = 1;
+  let records: unknown[];
+
+  // 1. Determine version and extract records array
   if (parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData) && 'ver' in parsedData) {
     currentVer = (parsedData as Record<string, unknown>).ver as number;
+    records = (parsedData as Record<string, unknown>).records as unknown[];
+  } else if (Array.isArray(parsedData)) {
+    currentVer = 1;
+    records = parsedData as unknown[];
+  } else {
+    // Unknown or invalid format
+    return { records: [], wasMigrated: false };
   }
 
   const initialVer = currentVer;
-  let migratedData: unknown = parsedData;
 
-  // Run migrations sequentially
+  // 2. Run migrations sequentially on the data array
   while (currentVer < STORAGE_CURRENT_VERSION && currentVer < migrations.length) {
     const migrateFn = migrations[currentVer];
     if (migrateFn) {
-      migratedData = migrateFn(migratedData);
+      records = migrateFn(records) as unknown[];
       currentVer++;
     } else {
-      // Failsafe if a migration step is missing
       break;
     }
   }
 
   const wasMigrated = initialVer < currentVer;
 
-  // Final validation to ensure the output matches the expected standard format
-  const finalData = migratedData as Record<string, unknown>;
-  if (
-    finalData &&
-    typeof finalData === 'object' &&
-    finalData.ver === STORAGE_CURRENT_VERSION &&
-    Array.isArray(finalData.records)
-  ) {
-    return { records: finalData.records as DailyRecord[], wasMigrated };
-  }
-
-  return { records: [], wasMigrated: false };
+  return { 
+    records: records as DailyRecord[], 
+    wasMigrated 
+  };
 };
 
 export const prepareDataForStorage = (records: DailyRecord[]) => {

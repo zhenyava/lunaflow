@@ -6,28 +6,25 @@ import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
 describe('storageService', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   describe('Migration Pipeline Registry', () => {
     it('should have a registered migration for every version bump up to STORAGE_CURRENT_VERSION', () => {
-      // Index 0 is a placeholder, so valid migrations start at index 1.
-      // If STORAGE_CURRENT_VERSION is 2, migrations array should have 2 elements (0 and 1).
-      // If STORAGE_CURRENT_VERSION is 3, migrations array should have 3 elements (0, 1, 2).
       expect(migrations.length).toBe(STORAGE_CURRENT_VERSION);
     });
   });
 
   describe('getLocalEvents & Migration', () => {
-    beforeEach(() => {
-      localStorage.clear();
-      vi.restoreAllMocks();
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
-        vi.restoreAllMocks();
-    });
-
     it('should migrate legacy events to DailyRecord and wrap in version 2', () => {
       const legacyEvents: LegacyCalendarEvent[] = [
         { date: '2024-01-01', type: 'period' },
@@ -43,7 +40,6 @@ describe('storageService', () => {
       expect(result[1]).toEqual(makePeriodRecord('2024-01-02'));
       expect(result[2]).toEqual(makeOvulationRecord('2024-01-14'));
 
-      // Should have saved the migrated data in versioned format
       const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
       expect(savedRaw.ver).toBe(2);
       expect(savedRaw.records).toEqual(result);
@@ -95,20 +91,21 @@ describe('storageService', () => {
 
   describe('mergeEvents', () => {
     it('should prefer the record with the higher updatedAt', () => {
+        const now = Date.now();
         const local: DailyRecord[] = [
-            makePeriodRecord('2024-01-01', Date.now()), // Older
-            makePeriodRecord('2024-01-02', Date.now() + 200), // Newer
+            makePeriodRecord('2024-01-01', now), // Older
+            makePeriodRecord('2024-01-02', now + 200), // Newer
         ];
         const remote: DailyRecord[] = [
-            { date: '2024-01-01', updatedAt: Date.now() + 100, isDeleted: true }, // Newer, user deleted
-            makePeriodRecord('2024-01-02', Date.now() + 100), // Older
+            { date: '2024-01-01', updatedAt: now + 100, isDeleted: true }, // Newer, user deleted
+            makePeriodRecord('2024-01-02', now + 100), // Older
         ];
 
         const result = mergeEvents(local, remote);
         
         expect(result).toHaveLength(2);
-        expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: Date.now() + 100, isDeleted: true });
-        expect(result[1]).toEqual(makePeriodRecord('2024-01-02', Date.now() + 200));
+        expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: now + 100, isDeleted: true });
+        expect(result[1]).toEqual(makePeriodRecord('2024-01-02', now + 200));
     });
   });
 });

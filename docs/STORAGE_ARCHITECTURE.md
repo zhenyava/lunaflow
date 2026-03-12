@@ -25,16 +25,18 @@ It works sequentially based on an array of migration functions registered in `sr
 
 ```typescript
 const migrations: MigrationFunction[] = [
-  (data) => data, // Index 0 (unused, versions start at 1)
-  migrateV1ToV2,  // Index 1: migrates data FROM v1 TO v2
-  // migrateV2ToV3, // Index 2: migrates data FROM v2 TO v3 (future)
+  (data) => data, // Index 0 (unused)
+  migrateV1ToV2,  // Index 1: migrates FROM v1 TO v2
 ];
 ```
 
 The `parseAndMigrateData(rawData)` function:
 1. Detects the version of `rawData`. Legacy flat arrays are considered `ver: 1`.
-2. Uses a `while` loop to pass the data through every migration function starting from `currentVer` up to `STORAGE_CURRENT_VERSION`.
-3. Returns a clean array of `DailyRecord[]`.
+2. Extracts the records array from the envelope (if `ver > 1`).
+3. Uses a `while` loop to pass the **data array only** through every migration function starting from `currentVer` up to `STORAGE_CURRENT_VERSION`. 
+4. Returns a clean array of `DailyRecord[]` and a `wasMigrated` flag.
+
+**Key benefit:** Migration functions are pure data transformations. They don't need to know about the storage envelope or update the version number manually; the orchestrator handles that by incrementing the version after each successful function execution.
 
 ## How to add a new version in the future
 
@@ -43,9 +45,10 @@ If we need to change the schema again (e.g., to version 3):
 1. **Update Constants**: 
    In `src/constants.ts`, bump `STORAGE_CURRENT_VERSION = 3`.
 2. **Write the Migration**:
-   In `src/services/migrationService.ts`, write a new function `migrateV2ToV3(v2Data)`. It should accept the `v2` format, modify it, and return `{ ver: 3, records: [...] }`.
+   In `src/services/migrationService.ts`, write a new function `migrateV2ToV3(records: DailyRecord[])`. It should accept the array of records and return the transformed array.
+   *If no structural changes are needed, you can use the `migrateVersionNumber` identity function.*
 3. **Register the Migration**:
-   Add `migrateV2ToV3` to the `migrations` array at index `2`.
+   Add the new function to the `migrations` array at index `2`.
 4. **Update Types**:
    Update `DailyRecord` in `src/types.ts` to reflect the v3 changes.
 

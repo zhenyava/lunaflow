@@ -4,10 +4,11 @@ import { makePeriodRecord, makeOvulationRecord } from '../types';
 export type MigrationFunction = (data: unknown) => unknown;
 
 /**
- * Migration from v1 (legacy array format) to v2 (versioned object format with DailyRecord schema).
- * V1 is strictly defined as LegacyCalendarEvent[].
+ * Migration from v1 (legacy array format) to v2 (DailyRecord schema).
+ * Input: LegacyCalendarEvent[]
+ * Output: DailyRecord[]
  */
-const migrateV1ToV2 = (legacyEvents: LegacyCalendarEvent[]) => {
+const migrateV1ToV2 = (legacyEvents: LegacyCalendarEvent[]): DailyRecord[] => {
   const map = new Map<string, DailyRecord>();
   const now = Date.now();
   
@@ -20,18 +21,15 @@ const migrateV1ToV2 = (legacyEvents: LegacyCalendarEvent[]) => {
     }
   });
   
-  return {
-    ver: 2,
-    records: Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
-  };
+  return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
 };
 
 /**
- * Standard migration function for when the schema is backwards compatible 
+ * Standard identity migration function for when the schema is backwards compatible 
  * and only the version number needs to be bumped.
  */
-export const migrateVersionNumber = (data: { ver: number, records: DailyRecord[] }) => {
-  return { ...data, ver: data.ver + 1 };
+export const migrateVersionNumber = (records: DailyRecord[]): DailyRecord[] => {
+  return records;
 };
 
 /**
