@@ -1,10 +1,10 @@
 import { format } from 'date-fns';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
 import CalendarMonth from './CalendarMonth';
 
 interface MobileCalendarViewProps {
     months: Date[];
-    events: CalendarEvent[];
+    events: DailyRecord[];
     predictedDates: Set<string>;
     predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;

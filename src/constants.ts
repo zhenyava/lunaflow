@@ -1,6 +1,7 @@
 export const APP_DATA_FILENAME = 'lunaflow_data.json';
 export const LOCAL_STORAGE_KEY = 'lunaflow_events';
 export const LAUNCHED_KEY = 'lunaflow_has_launched';
+export const STORAGE_CURRENT_VERSION = 2;
 
 // Colors for the calendar
 export const PERIOD_COLOR = 'bg-rose-500 text-white hover:bg-rose-600';

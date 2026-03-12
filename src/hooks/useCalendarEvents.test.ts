@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
 import * as storageService from '../services/storageService';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
+import { makePeriodRecord } from '../types';
 
 // Mock the storage service
 vi.mock('../services/storageService', () => ({
@@ -13,19 +14,26 @@ vi.mock('../services/storageService', () => ({
 describe('useCalendarEvents', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should initialize with events from local storage', () => {
-    const mockEvents: CalendarEvent[] = [{ date: '2024-03-01', type: 'period' }];
+    const mockEvents: DailyRecord[] = [makePeriodRecord('2024-03-01')];
     vi.mocked(storageService.getLocalEvents).mockReturnValue(mockEvents);
 
     const { result } = renderHook(() => useCalendarEvents());
 
     expect(result.current.events).toEqual(mockEvents);
+    expect(result.current.allRecords).toEqual(mockEvents);
     expect(storageService.getLocalEvents).toHaveBeenCalledOnce();
   });
 
-  it('should save to local storage when events change', () => {
+  it('should save to local storage (allRecords) when events change', () => {
     vi.mocked(storageService.getLocalEvents).mockReturnValue([]);
 
     const { result } = renderHook(() => useCalendarEvents());
@@ -38,15 +46,16 @@ describe('useCalendarEvents', () => {
       result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
     });
 
+    // saveLocalEvents should be called with the full record list
     expect(storageService.saveLocalEvents).toHaveBeenCalledWith([
-      { date: '2024-03-01', type: 'period' }
+      { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {} }
     ]);
   });
 
   describe('handleDayClick logic', () => {
     it('should add a new event when date is empty', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', type: 'period' }
+        makePeriodRecord('2024-03-01')
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -59,15 +68,17 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-05T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
-        { date: '2024-03-01', type: 'period' },
-        { date: '2024-03-05', type: 'ovulation' }
-      ]);
+      const expected = [
+        makePeriodRecord('2024-03-01'),
+        { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} }
+      ];
+      expect(result.current.events).toEqual(expected);
+      expect(result.current.allRecords).toEqual(expected);
     });
 
     it('should update event type when clicking existing date with different activeType', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', type: 'period' }
+        makePeriodRecord('2024-03-01')
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
@@ -80,67 +91,34 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
-        { date: '2024-03-01', type: 'ovulation' }
-      ]);
+      const expected = [
+        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {}, ovulation: {} }
+      ];
+      expect(result.current.events).toEqual(expected);
+      expect(result.current.allRecords).toEqual(expected);
     });
 
-    it('should remove the event when clicking existing date with the same activeType', () => {
+    it('should mark event as deleted and filter it from events when un-toggling', () => {
       vi.mocked(storageService.getLocalEvents).mockReturnValue([
-        { date: '2024-03-01', type: 'period' },
-        { date: '2024-03-02', type: 'period' }
+        makePeriodRecord('2024-03-01')
       ]);
       const { result } = renderHook(() => useCalendarEvents());
 
       act(() => {
-        // Defaults to 'period', but setting explicitly to be sure
         result.current.setActiveType('period');
       });
 
       act(() => {
-        // Click on existing day with same activeType
+        // Click on existing day with same activeType to toggle off
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      expect(result.current.events).toEqual([
-        { date: '2024-03-02', type: 'period' }
-      ]);
-    });
+      // UI 'events' should be empty
+      expect(result.current.events).toEqual([]);
 
-    it('should only update/remove a single matching event, preserving others on the same date if they existed', () => {
-      // It's a rare case, but testing object identity behavior
-      const sharedDate = '2024-03-01';
-      const event1: CalendarEvent = { date: sharedDate, type: 'period' };
-      const event2: CalendarEvent = { date: sharedDate, type: 'ovulation' };
-
-      vi.mocked(storageService.getLocalEvents).mockReturnValue([event1, event2]);
-      const { result } = renderHook(() => useCalendarEvents());
-
-      act(() => {
-        result.current.setActiveType('period');
-      });
-
-      act(() => {
-        // Click day: activeType 'period' matches event1 type.
-        // It should REMOVE event1, and LEAVE event2 untouched.
-        result.current.handleDayClick(new Date(`${sharedDate}T12:00:00Z`));
-      });
-
-      expect(result.current.events).toEqual([event2]);
-
-      // Now update type
-      act(() => {
-        result.current.setActiveType('period');
-      });
-
-      act(() => {
-        // Click day: activeType 'period' DOES NOT match event2 type ('ovulation').
-        // It should UPDATE event2 type to 'period'.
-        result.current.handleDayClick(new Date(`${sharedDate}T12:00:00Z`));
-      });
-
-      expect(result.current.events).toEqual([
-        { date: sharedDate, type: 'period' }
+      // 'allRecords' should contain the tombstone
+      expect(result.current.allRecords).toEqual([
+        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: true }
       ]);
     });
   });

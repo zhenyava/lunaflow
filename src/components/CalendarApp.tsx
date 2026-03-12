@@ -26,8 +26,9 @@ function CalendarApp() {
 
   // Custom Hooks
   const { 
-    events, 
-    setEvents, 
+    events,         // Filtered (isDeleted: false)
+    allRecords,     // Full (includes tombstones)
+    setEvents,      // Updater (affects allRecords)
     activeType, 
     setActiveType, 
     handleDayClick 
@@ -43,11 +44,11 @@ function CalendarApp() {
     performFullSync,
     driveFileId
   } = useGoogleSync({ 
-      events, 
+      events: allRecords, // Pass raw records for sync
       setEvents
   });
 
-  // Statistics & Predictions
+  // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
 
   // Desktop: Generate months for the selected year
@@ -95,7 +96,7 @@ function CalendarApp() {
         
         <MobileCalendarView 
             months={mobileMonths}
-            events={events}
+            events={events} // UI uses cleaned events
             predictedDates={predictedDates}
             predictedOvulationDates={predictedOvulationDates}
             onDayClick={handleDayClick}
@@ -106,7 +107,7 @@ function CalendarApp() {
             onPrevYear={handlePrevYear}
             onNextYear={handleNextYear}
             months={desktopMonths}
-            events={events}
+            events={events} // UI uses cleaned events
             predictedDates={predictedDates}
             predictedOvulationDates={predictedOvulationDates}
             onDayClick={handleDayClick}

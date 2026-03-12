@@ -1,3 +1,4 @@
+import { makePeriodRecord } from '../types';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render } from '@testing-library/react';
 import SmartRedirect from './SmartRedirect';
@@ -12,8 +13,7 @@ vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
   return {
     ...actual,
-    useNavigate: () => mockNavigate,
-  };
+    useNavigate: () => mockNavigate};
 });
 
 // Mock LandingPage
@@ -57,10 +57,7 @@ describe('SmartRedirect', () => {
   });
 
   it('redirects to /calendar if user has local events', () => {
-    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([{
-      date: '2023-01-01',
-      type: 'period'
-    }]);
+    vi.spyOn(storageService, 'getLocalEvents').mockReturnValue([makePeriodRecord('2023-01-01')]);
 
     renderComponent();
 

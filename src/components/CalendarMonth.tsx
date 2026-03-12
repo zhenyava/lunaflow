@@ -2,11 +2,11 @@ import React from 'react';
 import { DayPicker } from 'react-day-picker';
 import { parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
-import type { CalendarEvent } from '../types';
+import type { DailyRecord } from '../types';
 
 interface CalendarMonthProps {
   month: Date;
-  events?: CalendarEvent[];
+  events?: DailyRecord[];
   predictedDates?: Set<string>;
   predictedOvulationDates?: Set<string>;
   onDayClick?: (date: Date) => void;
@@ -25,10 +25,10 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   const { periodDates, ovulationDates, predicted, predictedOvulation } = React.useMemo(() => {
     return {
       periodDates: events
-        .filter(e => e.type === 'period')
+        .filter(e => !!e.period)
         .map(e => parseISO(e.date)),
       ovulationDates: events
-        .filter(e => e.type === 'ovulation')
+        .filter(e => !!e.ovulation)
         .map(e => parseISO(e.date)),
       predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
       predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))

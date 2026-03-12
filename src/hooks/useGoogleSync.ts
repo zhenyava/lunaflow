@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { CalendarEvent, GoogleToken, SyncState } from '../types';
+import type { DailyRecord, GoogleToken, SyncState } from '../types';
 import { 
   initializeGoogleApi, 
   signInToGoogle, 
@@ -9,25 +9,24 @@ import {
   revokeToken,
   restoreGapiSession
 } from '../services/googleService';
-import { mergeEvents, saveLocalEvents } from '../services/storageService';
+import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
-export function eventsEqual(a: CalendarEvent[], b: CalendarEvent[]): boolean {
+export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    const eventA = a[i];
-    const eventB = b[i];
+  if (a.length === 0 && b.length === 0) return true;
 
-    if (eventA.date !== eventB.date || eventA.type !== eventB.type) {
-      return false;
-    }
-  }
-  return true;
+  // Sort by date to ensure order, then stringify for a deep comparison.
+  const sortFn = (x: DailyRecord, y: DailyRecord) => x.date.localeCompare(y.date);
+  const stringA = JSON.stringify([...a].sort(sortFn));
+  const stringB = JSON.stringify([...b].sort(sortFn));
+
+  return stringA === stringB;
 }
 
 interface UseGoogleSyncProps {
-  events: CalendarEvent[];
-  setEvents: React.Dispatch<React.SetStateAction<CalendarEvent[]>>;
+  events: DailyRecord[];
+  setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
 }
 
 export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
@@ -66,7 +65,8 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     if (!fileId) return;
     setSyncState({ status: 'syncing' });
     try {
-        const remoteEvents = await fetchDriveDataContent(fileId);
+        const rawRemoteData = await fetchDriveDataContent(fileId);
+        const { records: remoteEvents } = parseAndMigrateData(rawRemoteData);
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         
