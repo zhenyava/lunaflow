@@ -71,7 +71,7 @@ export interface GoogleToken {
 /**
  * Helper to create a DailyRecord with period data.
  */
-export const makePeriodRecord = (date: string, intensity?: FlowIntensity, updatedAt = Date.now()): DailyRecord => ({
+export const makePeriodRecord = (date: string, updatedAt = Date.now(), intensity?: FlowIntensity): DailyRecord => ({
   date,
   updatedAt,
   period: intensity ? { intensity } : {}
