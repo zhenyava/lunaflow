@@ -1,5 +1,5 @@
-import type { DailyRecord, GoogleToken, StoredDataV2 } from '../types';
-import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
+import type { DailyRecord, GoogleToken } from '../types';
+import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME, STORAGE_CURRENT_VERSION } from '../constants';
 
 // Declare global types for GAPI and Google Identity Services
 interface TokenClient {
@@ -220,7 +220,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
       mimeType: 'application/json'
     };
 
-    const initialData: StoredDataV2 = { ver: 2, records: [] };
+    const initialData = { ver: STORAGE_CURRENT_VERSION, records: [] as DailyRecord[] };
     const initialContent = JSON.stringify(initialData);
     const file = new Blob([initialContent], { type: 'application/json' });
 
@@ -258,7 +258,7 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
   const token = window.gapi.client.getToken();
   if (!token) throw new Error("No token for upload");
 
-  const data: StoredDataV2 = { ver: 2, records: events };
+  const data = { ver: STORAGE_CURRENT_VERSION, records: events };
   const fileContent = JSON.stringify(data);
   const accessToken = token.access_token;
   
@@ -290,11 +290,17 @@ export const fetchDriveDataContent = async (fileId: string): Promise<DailyRecord
             fileId: fileId,
             alt: 'media'
         });
-        const parsed = fileResponse.result;
+        const parsed = fileResponse.result as Record<string, unknown> | DailyRecord[];
 
         // Handle versioned format { ver: 2, records: [] }
-        if (parsed && typeof parsed === 'object' && 'ver' in parsed && 'records' in parsed) {
-            return (parsed as StoredDataV2).records;
+        if (
+            parsed && 
+            !Array.isArray(parsed) && 
+            typeof parsed === 'object' && 
+            parsed.ver === STORAGE_CURRENT_VERSION && 
+            Array.isArray(parsed.records)
+        ) {
+            return parsed.records as DailyRecord[];
         }
 
         // Handle legacy array format [ DailyRecord, ... ]

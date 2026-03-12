@@ -68,15 +68,6 @@ export interface GoogleToken {
 }
 
 /**
- * Container for the versioned storage format.
- */
-export interface StoredDataV2 {
-  ver: 2;
-  records: DailyRecord[];
-}
-
-
-/**
  * Helper to create a DailyRecord with period data.
  */
 export const makePeriodRecord = (date: string, updatedAt = Date.now(), intensity?: FlowIntensity): DailyRecord => ({
@@ -92,12 +83,4 @@ export const makeOvulationRecord = (date: string, updatedAt = Date.now()): Daily
   date,
   updatedAt,
   ovulation: {}
-});
-
-/**
- * Helper to create an empty DailyRecord.
- */
-export const makeEmptyRecord = (date: string, updatedAt = Date.now()): DailyRecord => ({
-  date,
-  updatedAt
 });

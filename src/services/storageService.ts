@@ -1,6 +1,6 @@
-import type { DailyRecord, LegacyCalendarEvent, StoredDataV2 } from '../types';
-import { LOCAL_STORAGE_KEY } from '../constants';
-import { makeEmptyRecord } from '../types';
+import type { DailyRecord, LegacyCalendarEvent } from '../types';
+import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { makePeriodRecord, makeOvulationRecord } from '../types';
 
 const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord[] => {
   const map = new Map<string, DailyRecord>();
@@ -8,15 +8,20 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
 
   legacyEvents.forEach(event => {
     let record = map.get(event.date);
+    
     if (!record) {
-      record = makeEmptyRecord(event.date, now);
+      if (event.type === 'period') {
+        record = makePeriodRecord(event.date, now);
+      } else {
+        record = makeOvulationRecord(event.date, now);
+      }
       map.set(event.date, record);
-    }
-
-    if (event.type === 'period') {
-      record.period = {};
-    } else if (event.type === 'ovulation') {
-      record.ovulation = {};
+    } else {
+      if (event.type === 'period') {
+        record.period = {};
+      } else if (event.type === 'ovulation') {
+        record.ovulation = {};
+      }
     }
   });
 
@@ -25,7 +30,7 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
 
 export const saveLocalEvents = (events: DailyRecord[]) => {
   try {
-    const data: StoredDataV2 = { ver: 2, records: events };
+    const data = { ver: STORAGE_CURRENT_VERSION, records: events };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
   } catch (e) {
     console.error('Failed to save to local storage', e);
@@ -39,9 +44,9 @@ export const getLocalEvents = (): DailyRecord[] => {
 
     const parsed = JSON.parse(data);
     
-    // 1. Check if it's the NEW versioned format { ver, records }
-    if (parsed && typeof parsed === 'object' && 'ver' in parsed && 'records' in parsed) {
-      return (parsed as StoredDataV2).records;
+    // 1. Check if it's the NEW versioned format
+    if (parsed && typeof parsed === 'object' && parsed.ver === STORAGE_CURRENT_VERSION && Array.isArray(parsed.records)) {
+      return parsed.records as DailyRecord[];
     }
 
     // 2. Handle intermediate or legacy array formats
