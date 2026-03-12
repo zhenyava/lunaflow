@@ -6,8 +6,6 @@ interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isAuthenticated: boolean;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
     onLogin: () => void;
     onLogout: () => void;
 }
@@ -15,15 +13,13 @@ interface SettingsModalProps {
 export default function SettingsModal({
     isOpen,
     isAuthenticated,
-    googleClientId,
-    setGoogleClientId,
     onLogin,
     onLogout
 }: SettingsModalProps) {
     const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
 
     const resetClientId = () => {
-        if(confirm("Reset all settings?")) {
+        if(confirm("Reset all settings? This will clear local data.")) {
             localStorage.clear();
             window.location.reload();
         }
@@ -47,18 +43,6 @@ export default function SettingsModal({
                  
                  {!isAuthenticated ? (
                      <div className="space-y-2">
-                         {!googleClientId && (
-                             <input 
-                                type="text" 
-                                placeholder="Enter Google Client ID" 
-                                className="w-full text-xs p-2 border rounded"
-                                onChange={(e) => {
-                                    setGoogleClientId(e.target.value);
-                                    localStorage.setItem('LUNA_GOOGLE_CLIENT_ID', e.target.value);
-                                }}
-                                value={googleClientId}
-                             />
-                         )}
                          <button onClick={onLogin} className="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold hover:bg-blue-600">
                              Connect Google Drive
                          </button>

@@ -1,220 +1,108 @@
-import type { DailyRecord, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
+import type { DailyRecord } from '../types';
+import { APP_DATA_FILENAME, FOLDER_NAME } from '../constants';
 import { prepareDataForStorage } from './storageService';
 
-// Declare global types for GAPI and Google Identity Services
-interface TokenClient {
-  callback: (resp: GoogleToken & { error?: unknown }) => Promise<void> | void;
-  requestAccessToken: (options: { prompt: string }) => void;
-}
-
-interface GapiFileResult<T = unknown> {
-  result: T;
-}
-
-interface GapiClient {
-  load: (lib: string, callback: () => void) => void;
-  client: {
-    init: (config: { discoveryDocs: string[] }) => Promise<void>;
-    setToken: (token: GoogleToken | null) => void;
-    getToken: () => GoogleToken | null;
-    drive: {
-      files: {
-        list: (params: Record<string, unknown>) => Promise<GapiFileResult<{ files: Array<{ id: string; name: string }> }>>;
-        create: (params: Record<string, unknown>) => Promise<GapiFileResult<{ id: string }>>;
-        get: (params: Record<string, unknown>) => Promise<GapiFileResult<unknown>>;
-      };
-    };
-  };
-}
-
-declare global {
-  interface Window {
-    dataLayer?: Record<string, unknown>[];
-    google: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: {
-            client_id: string;
-            scope: string;
-            callback: string | TokenClient['callback'];
-          }) => TokenClient;
-          revoke: (accessToken: string, callback: () => void) => void;
-        };
-      };
-    };
-    gapi: GapiClient;
-  }
-}
-
-let tokenClient: TokenClient | null = null;
-let gapiInited = false;
-let gisInited = false;
-
-// Initialize the Google API Client
-export const initializeGoogleApi = (
-  clientId: string,
-  onInit: (success: boolean) => void
-) => {
-  if (!clientId) {
-    onInit(false);
-    return;
-  }
-
-  const initGapi = async () => {
-      try {
-        await window.gapi.client.init({
-            discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-        });
-        gapiInited = true;
-        checkDone();
-      } catch (e: unknown) {
-        console.error("Error initializing GAPI client", e);
-      }
-  };
-
-  const initGis = () => {
-      try {
-        tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: clientId,
-            scope: SCOPES,
-            callback: '', // defined at request time
-        });
-        gisInited = true;
-        checkDone();
-      } catch (e: unknown) {
-        console.error("Error initializing GIS client", e);
-      }
-  }
-
-  const checkDone = () => {
-      if (gapiInited && gisInited) onInit(true);
-  }
-
-  // Load GAPI script if not present
-  if (!document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
-      const script1 = document.createElement('script');
-      script1.src = "https://apis.google.com/js/api.js";
-      script1.onload = () => window.gapi.load('client', initGapi);
-      document.body.appendChild(script1);
-  } else if (window.gapi) {
-      // If script is loaded, ensure client is initialized
-      if (!gapiInited) window.gapi.load('client', initGapi);
-      else checkDone();
-  }
-
-  // Load GIS script if not present
-  if (!document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
-      const script2 = document.createElement('script');
-      script2.src = "https://accounts.google.com/gsi/client";
-      script2.onload = initGis;
-      document.body.appendChild(script2);
-  } else if (window.google && window.google.accounts) {
-      // If script is loaded, re-init token client with potentially new ID
-      initGis();
-  }
-};
+let cachedGoogleToken: string | null = null;
+let tokenExpiration: number = 0;
 
 /**
- * Manually sets the token in GAPI client.
- * Used for restoring session from LocalStorage.
+ * Fetches a valid Google Access Token from our Vercel API using the Clerk token.
  */
-export const restoreGapiSession = (token: GoogleToken) => {
-    if (window.gapi && window.gapi.client) {
-        window.gapi.client.setToken(token);
+export const getValidAccessToken = async (getClerkToken: () => Promise<string | null>): Promise<string> => {
+  // Use cached token if valid (with 5-minute buffer)
+  if (cachedGoogleToken && Date.now() < tokenExpiration - 300000) {
+    return cachedGoogleToken;
+  }
+
+  const clerkToken = await getClerkToken();
+  if (!clerkToken) {
+    throw new Error("Not authenticated with Clerk");
+  }
+
+  const response = await fetch('/api/get-drive-token', {
+    headers: {
+      'Authorization': `Bearer ${clerkToken}`
     }
-};
-
-/**
- * forceConsent: 
- * - true: Shows the "Allow access" screen
- * - false: Tries to get token (NOTE: In modern browsers this still opens a popup)
- */
-export const signInToGoogle = async (forceConsent: boolean = true): Promise<GoogleToken> => {
-  return new Promise((resolve, reject) => {
-    if (!tokenClient) return reject(new Error('Google Identity Services not initialized'));
-
-    tokenClient.callback = async (resp: GoogleToken & { error?: unknown }) => {
-      if (resp.error) {
-        reject(resp);
-        return;
-      }
-      
-      // CRITICAL FIX: Connect the token from GIS to GAPI
-      // This is required for gapi.client.drive calls to work
-      if (window.gapi && window.gapi.client) {
-          window.gapi.client.setToken(resp);
-      }
-
-      if (window.dataLayer) {
-        window.dataLayer.push({ event: 'google_drive_auth' });
-      }
-
-      resolve(resp as GoogleToken);
-    };
-
-    // 'consent' forces the screen, '' (empty) tries to skip it if already granted
-    tokenClient.requestAccessToken({ prompt: forceConsent ? 'consent' : '' });
   });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Unauthorized");
+    }
+    throw new Error(`Failed to get Google token: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  cachedGoogleToken = data.accessToken;
+  // Tokens from Clerk/Google usually last 1 hour. 
+  // We'll set a conservative expiration of 50 minutes.
+  tokenExpiration = Date.now() + 50 * 60 * 1000;
+  
+  return cachedGoogleToken!;
 };
 
 /**
  * Checks if the data file exists in Drive.
- * If yes, returns the File ID.
- * If no, creates an empty file and returns the new File ID.
- * Now it uses a visible folder instead of appDataFolder.
  */
-export const ensureDriveFileExists = async (): Promise<string> => {
+export const ensureDriveFileExists = async (googleToken: string): Promise<string> => {
   try {
-    // Ensure we have a token before trying to list files
-    const token = window.gapi.client.getToken();
-    if (!token) {
-        throw new Error("No Google API token found. Please sign in.");
-    }
-
     // 1. Find or create the LunaFlow folder
     let folderId = '';
-    const folderResponse = await window.gapi.client.drive.files.list({
-      q: `name = '${FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-      fields: 'files(id, name)',
-      spaces: 'drive'
-    });
+    const folderListUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+      `name = '${FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
+    )}&fields=files(id, name)&spaces=drive`;
 
-    const folders = folderResponse.result.files;
+    const folderListResponse = await fetch(folderListUrl, {
+      headers: { 'Authorization': `Bearer ${googleToken}` }
+    });
+    
+    if (!folderListResponse.ok) {
+        if (folderListResponse.status === 401) throw new Error("Unauthorized");
+        throw new Error(`Folder list failed: ${folderListResponse.statusText}`);
+    }
+
+    const folderListData = await folderListResponse.json();
+    const folders = folderListData.files;
+
     if (folders && folders.length > 0) {
       folderId = folders[0].id;
       console.log('Found existing folder:', folderId);
     } else {
       console.log('Creating new folder...');
-      const folderMetadata = {
-        name: FOLDER_NAME,
-        mimeType: 'application/vnd.google-apps.folder'
-      };
-      const createFolderResponse = await window.gapi.client.drive.files.create({
-        resource: folderMetadata,
-        fields: 'id'
+      const createFolderResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: FOLDER_NAME,
+          mimeType: 'application/vnd.google-apps.folder'
+        })
       });
-      folderId = createFolderResponse.result.id;
+      const newFolder = await createFolderResponse.json();
+      folderId = newFolder.id;
       console.log('Created new folder:', folderId);
     }
 
     // 2. Check if file exists inside the folder
-    const response = await window.gapi.client.drive.files.list({
-      spaces: 'drive',
-      fields: 'files(id, name)',
-      q: `name = '${APP_DATA_FILENAME}' and '${folderId}' in parents and trashed = false`,
-      pageSize: 1
-    });
+    const fileListUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+      `name = '${APP_DATA_FILENAME}' and '${folderId}' in parents and trashed = false`
+    )}&fields=files(id, name)&spaces=drive&pageSize=1`;
 
-    const files = response.result.files;
+    const fileListResponse = await fetch(fileListUrl, {
+      headers: { 'Authorization': `Bearer ${googleToken}` }
+    });
+    const fileListData = await fileListResponse.json();
+    const files = fileListData.files;
     
     if (files && files.length > 0) {
-      console.log('Found existing file in visible folder:', files[0].id);
+      console.log('Found existing file:', files[0].id);
       return files[0].id;
     }
 
     // 3. Create file in visible folder
-    console.log('Creating new file in visible folder...');
+    console.log('Creating new file...');
     const metadata = {
       name: APP_DATA_FILENAME,
       parents: [folderId],
@@ -223,18 +111,15 @@ export const ensureDriveFileExists = async (): Promise<string> => {
 
     const initialData = prepareDataForStorage([]);
     const initialContent = JSON.stringify(initialData);
-    const file = new Blob([initialContent], { type: 'application/json' });
+    const fileBlob = new Blob([initialContent], { type: 'application/json' });
 
-    const accessToken = token.access_token;
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
+    form.append('file', fileBlob);
 
     const createResponse = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
       method: 'POST',
-      headers: {
-          'Authorization': `Bearer ${accessToken}`
-      },
+      headers: { 'Authorization': `Bearer ${googleToken}` },
       body: form
     });
     
@@ -243,9 +128,8 @@ export const ensureDriveFileExists = async (): Promise<string> => {
     }
 
     const result = await createResponse.json();
-    console.log('File created and migrated if necessary:', result.id);
+    console.log('File created:', result.id);
     return result.id;
-
   } catch (error) {
     console.error("Error ensuring drive file exists:", error);
     throw error;
@@ -255,28 +139,22 @@ export const ensureDriveFileExists = async (): Promise<string> => {
 /**
  * Uploads data to a specific File ID using PATCH
  */
-export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Promise<void> => {
-  const token = window.gapi.client.getToken();
-  if (!token) throw new Error("No token for upload");
-
+export const uploadDriveData = async (fileId: string, events: DailyRecord[], googleToken: string): Promise<void> => {
   const data = prepareDataForStorage(events);
   const fileContent = JSON.stringify(data);
-  const accessToken = token.access_token;
   
   try {
     const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
       method: 'PATCH',
       headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          'Authorization': `Bearer ${googleToken}`,
           'Content-Type': 'application/json'
       },
       body: fileContent
     });
 
     if (!response.ok) {
-        if (response.status === 401) {
-             throw new Error("Unauthorized");
-        }
+        if (response.status === 401) throw new Error("Unauthorized");
         throw new Error(`Upload failed: ${response.statusText}`);
     }
   } catch (error) {
@@ -285,27 +163,34 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
   }
 };
 
-export const fetchDriveDataContent = async (fileId: string): Promise<unknown> => {
+/**
+ * Fetches data content from a specific File ID
+ */
+export const fetchDriveDataContent = async (fileId: string, googleToken: string): Promise<unknown> => {
     try {
-        const fileResponse = await window.gapi.client.drive.files.get({
-            fileId: fileId,
-            alt: 'media'
+        const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+          headers: { 'Authorization': `Bearer ${googleToken}` }
         });
-        return fileResponse.result; // Returns raw parsed JSON, parsing and migration handled by caller
+        
+        if (!response.ok) {
+          if (response.status === 401) throw new Error("Unauthorized");
+          throw new Error(`Fetch failed: ${response.statusText}`);
+        }
+        
+        return await response.json();
     } catch (error) {
         console.error("Fetch Content Error", error);
         throw error;
     }
-}
+};
 
+// Compatibility exports for migration
+export const initializeGoogleApi = (_clientId: string, onInit: (success: boolean) => void) => {
+  onInit(true);
+};
+export const signInToGoogle = async () => ({ access_token: '' });
+export const restoreGapiSession = () => {};
 export const revokeToken = () => {
-    try {
-        const token = window.gapi.client.getToken();
-        if (token) {
-            window.google.accounts.oauth2.revoke(token.access_token, () => {console.log('Revoked')});
-            window.gapi.client.setToken(null);
-        }
-    } catch(e) {
-        console.warn("Error revoking token", e);
-    }
-}
+  cachedGoogleToken = null;
+  tokenExpiration = 0;
+};

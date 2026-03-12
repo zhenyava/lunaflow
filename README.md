@@ -21,13 +21,12 @@ https://www.lunaflow.fit/
 
 ### (Optional) To enable the Google Drive Sync locally:
 
-1. Create a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Drive API**.
-3. Create OAuth 2.0 credentials (**Client ID** for Web Application).
-4. Add `http://localhost:5173` to "Authorized JavaScript origins".
-5. Create a `.env` file in the root directory:
-   ```env
-   VITE_GOOGLE_CLIENT_ID=your_client_id_here.apps.googleusercontent.com
-   ```
-   *Alternatively, you can enter the Client ID directly in the App Settings UI.*
-
+1.  Set up a project in [Clerk](https://clerk.com/).
+2.  Enable **Google SSO** in the Clerk dashboard.
+3.  Add the `https://www.googleapis.com/auth/drive.file` scope in Clerk's Google SSO settings.
+4.  Create a `.env` file in the root directory:
+    ```env
+    VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+    CLERK_SECRET_KEY=sk_test_...
+    ```
+5.  Run `npm run dev` and sign in.

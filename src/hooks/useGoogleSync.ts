@@ -1,16 +1,14 @@
-import { useState, useEffect, useCallback } from 'react';
-import type { DailyRecord, GoogleToken, SyncState } from '../types';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth, useUser, useClerk } from '@clerk/react';
+import type { DailyRecord, SyncState } from '../types';
 import { 
-  initializeGoogleApi, 
-  signInToGoogle, 
   ensureDriveFileExists, 
   uploadDriveData, 
   fetchDriveDataContent,
-  revokeToken,
-  restoreGapiSession
+  getValidAccessToken,
+  revokeToken
 } from '../services/googleService';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
-import { GOOGLE_CLIENT_ID } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
@@ -30,43 +28,47 @@ interface UseGoogleSyncProps {
 }
 
 export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [driveFileId, setDriveFileId] = useState<string | null>(null);
+  const { isSignedIn, getToken, signOut } = useAuth();
+  const { user } = useUser();
+  const clerk = useClerk();
+  const [driveFileId, setDriveFileId] = useState<string | null>(localStorage.getItem('LUNA_DRIVE_FILE_ID'));
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
-  const [isApiInitialized, setIsApiInitialized] = useState(false);
-  
-  // Use Client ID from constants or fallback to local storage
-  const [googleClientId, setGoogleClientId] = useState(() => {
-     return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
-  });
+  const isSyncingRef = useRef(false);
 
-  // Init Google API
-  useEffect(() => {
-    if (googleClientId) {
-      initializeGoogleApi(googleClientId, (success) => {
-        if (success) {
-           console.log("Google API Initialized");
-           setIsApiInitialized(true);
-        }
+  const handleLogin = async () => {
+    try {
+      // @ts-ignore - Clerk v5 authenticateWithRedirect exists on LoadedClerk
+      await clerk.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: '/calendar',
+        redirectUrlComplete: '/calendar',
       });
+    } catch (error) {
+      console.error("Clerk login error", error);
+      alert("Failed to initiate login with Google.");
     }
-  }, [googleClientId]);
+  };
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+      await signOut();
       revokeToken();
-      setIsAuthenticated(false);
       setDriveFileId(null);
       setSyncState({ status: 'idle' });
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
-  }, []);
+      localStorage.removeItem('LUNA_DRIVE_FILE_ID');
+      localStorage.removeItem('LUNA_DRIVE_CONNECTED');
+  }, [signOut]);
 
   // CORE SYNCHRONIZATION LOGIC
   const performFullSync = useCallback(async (fileId: string) => {
-    if (!fileId) return;
+    if (!fileId || isSyncingRef.current) return;
+    isSyncingRef.current = true;
     setSyncState({ status: 'syncing' });
+    
     try {
-        const rawRemoteData = await fetchDriveDataContent(fileId);
+        const googleToken = await getValidAccessToken(getToken);
+        const rawRemoteData = await fetchDriveDataContent(fileId, googleToken);
         const { records: remoteEvents } = parseAndMigrateData(rawRemoteData);
+        
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
         
@@ -78,127 +80,92 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
 
         const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
         if (isRemoteDifferent) {
-             await uploadDriveData(fileId, merged);
+             await uploadDriveData(fileId, merged, googleToken);
         }
 
         setSyncState({ status: 'success', lastSynced: new Date() });
     } catch (error: unknown) {
+        console.error("Sync Error:", error);
         const err = error as { message?: string; status?: number };
         if (err.message === 'Unauthorized' || err.status === 401) {
-            handleLogout();
+            setSyncState({ status: 'error' });
+            // Let Clerk handle session expiration or refresh
         } else {
             setSyncState({ status: 'error' });
         }
+    } finally {
+        isSyncingRef.current = false;
     }
-  }, [events, setEvents, handleLogout]);
+  }, [events, setEvents, getToken]);
 
-  // Token-based Session Restore
+  // Initial Sync when signed in or when driveFileId changes
   useEffect(() => {
-    if (!isApiInitialized || isAuthenticated) return;
-
-    try {
-        const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
-        if (storedTokenStr) {
-            const token: GoogleToken = JSON.parse(storedTokenStr);
-            const now = Date.now();
-            
-            if (token.expires_at && token.expires_at > now + 60000) {
-                restoreGapiSession(token);
-                setTimeout(() => {
-                    setIsAuthenticated(true);
-                    ensureDriveFileExists()
-                        .then(id => {
-                            setDriveFileId(id);
-                            performFullSync(id); 
-                        })
-                        .catch(() => {
-                            handleLogout();
-                        });
-                }, 0);
-            } else {
-                localStorage.removeItem('LUNA_AUTH_TOKEN');
-                setTimeout(() => {
-                    setIsAuthenticated(false);
-                    setSyncState({ status: 'idle' });
-                }, 0);
+    if (isSignedIn && !driveFileId && syncState.status === 'idle') {
+        const initDrive = async () => {
+            try {
+                setSyncState({ status: 'syncing' });
+                const googleToken = await getValidAccessToken(getToken);
+                const id = await ensureDriveFileExists(googleToken);
+                setDriveFileId(id);
+                localStorage.setItem('LUNA_DRIVE_FILE_ID', id);
+                localStorage.setItem('LUNA_DRIVE_CONNECTED', 'true');
+                await performFullSync(id);
+            } catch (e) {
+                console.error("Drive Init Error", e);
+                setSyncState({ status: 'error' });
             }
-        }
-    } catch {
-        localStorage.removeItem('LUNA_AUTH_TOKEN');
+        };
+        initDrive();
+    } else if (isSignedIn && driveFileId && syncState.status === 'idle') {
+        performFullSync(driveFileId);
     }
-  }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync]);
-
-  const handleGoogleLogin = async () => {
-    if (!googleClientId) {
-      alert("Please enter a Google Client ID in the settings first.");
-      return;
-    }
-    
-    try {
-      setSyncState({ status: 'syncing' });
-      const tokenResponse = await signInToGoogle(true);
-      if (tokenResponse && tokenResponse.expires_in) {
-          const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
-          const tokenToStore: GoogleToken = { ...tokenResponse, expires_at: expiresAt };
-          localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(tokenToStore));
-      }
-      const fileId = await ensureDriveFileExists();
-      setDriveFileId(fileId);
-      setIsAuthenticated(true);
-      await performFullSync(fileId);
-
-    } catch (error: unknown) {
-      setSyncState({ status: 'error' });
-      setIsAuthenticated(false);
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
-      let errorMessage = "Login failed.";
-      const err = error as { message?: string };
-      if (err?.message) errorMessage = err.message;
-      alert(errorMessage);
-    }
-  };
+  }, [isSignedIn, driveFileId, getToken, performFullSync, syncState.status]);
 
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
-          if (isAuthenticated && driveFileId && syncState.status !== 'syncing') {
+          if (isSignedIn && driveFileId && syncState.status !== 'syncing') {
               performFullSync(driveFileId);
           }
       };
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, driveFileId, syncState.status, performFullSync]);
+  }, [isSignedIn, driveFileId, syncState.status, performFullSync]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !driveFileId) return;
+    if (!isSignedIn || !driveFileId) return;
+    
+    // Don't save if we just synced successfully in the last 2 seconds
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
+        if (isSyncingRef.current) return;
         setSyncState({ status: 'syncing' });
         try {
-            await uploadDriveData(driveFileId, events);
+            const googleToken = await getValidAccessToken(getToken);
+            await uploadDriveData(driveFileId, events, googleToken);
             setSyncState({ status: 'success', lastSynced: new Date() });
         } catch (error: unknown) {
+             console.error("Auto-save error", error);
              const err = error as { message?: string; status?: number };
              if (err.message === 'Unauthorized' || err.status === 401) {
-                handleLogout();
+                setSyncState({ status: 'error' });
             } else {
                 setSyncState({ status: 'error' });
             }
         }
-    }, 2000); 
+    }, 3000); 
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced]);
+  }, [events, isSignedIn, driveFileId, getToken, syncState.status, syncState.lastSynced]);
 
   return {
-    isAuthenticated,
+    isAuthenticated: isSignedIn,
+    user,
     driveFileId,
     syncState,
-    googleClientId,
-    setGoogleClientId,
-    handleGoogleLogin,
+    handleLogin,
     handleLogout,
     performFullSync
   };

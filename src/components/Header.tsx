@@ -16,8 +16,6 @@ interface HeaderProps {
     // Settings Props
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
     onLogout: () => void;
 }
 
@@ -55,8 +53,6 @@ export default function Header({
     onLogin,
     isSettingsOpen,
     setSettingsOpen,
-    googleClientId,
-    setGoogleClientId,
     onLogout
 }: HeaderProps) {
     const navigate = useNavigate();
@@ -141,8 +137,6 @@ export default function Header({
                 isOpen={isSettingsOpen}
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}
-                googleClientId={googleClientId}
-                setGoogleClientId={setGoogleClientId}
                 onLogin={onLogin}
                 onLogout={onLogout}
             />

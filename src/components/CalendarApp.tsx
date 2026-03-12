@@ -37,9 +37,7 @@ function CalendarApp() {
   const {
     isAuthenticated,
     syncState,
-    googleClientId,
-    setGoogleClientId,
-    handleGoogleLogin,
+    handleLogin,
     handleLogout,
     performFullSync,
     driveFileId
@@ -80,14 +78,12 @@ function CalendarApp() {
         avgPeriodDuration={avgPeriodDuration}
         activeType={activeType}
         setActiveType={setActiveType}
-        isAuthenticated={isAuthenticated}
+        isAuthenticated={isAuthenticated || false}
         syncState={syncState}
         onSync={() => driveFileId && performFullSync(driveFileId)}
-        onLogin={handleGoogleLogin}
+        onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
-        googleClientId={googleClientId}
-        setGoogleClientId={setGoogleClientId}
         onLogout={handleLogout}
       />
 
