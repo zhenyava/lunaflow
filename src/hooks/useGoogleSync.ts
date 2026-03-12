@@ -9,8 +9,7 @@ import {
   revokeToken,
   restoreGapiSession
 } from '../services/googleService';
-import { mergeEvents, saveLocalEvents } from '../services/storageService';
-import { parseAndMigrateData } from '../services/migrationService';
+import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
 import { GOOGLE_CLIENT_ID } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {

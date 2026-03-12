@@ -14,14 +14,14 @@ This document outlines the approach used to store, version, and migrate data in 
    ```
 3. **Transport Layer vs. Business Logic**: 
    - `googleService.ts` is purely a transport layer. It only knows how to GET and PATCH JSON objects. It does not know what `ver` or `DailyRecord` are.
-   - `storageService.ts` handles `localStorage` and merging.
-   - `migrationService.ts` is responsible for parsing raw JSON, determining its version, and migrating it through a sequential pipeline to the current version.
+   - `storageService.ts` handles `localStorage`, merging, and is the entry point for migration (`parseAndMigrateData`).
+   - `migrationService.ts` is a registry of transformation functions. It defines the `migrations` array.
 
 ## The Migration Pipeline
 
-The migration logic lives in `src/services/migrationService.ts`.
+The entry point for migration logic is `parseAndMigrateData(rawData)` in `src/services/storageService.ts`.
 
-It works sequentially based on an array of migration functions.
+It works sequentially based on an array of migration functions registered in `src/services/migrationService.ts`.
 
 ```typescript
 const migrations: MigrationFunction[] = [

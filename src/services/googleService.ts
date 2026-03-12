@@ -1,6 +1,6 @@
 import type { DailyRecord, GoogleToken } from '../types';
 import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
-import { prepareDataForStorage } from './migrationService';
+import { prepareDataForStorage } from './storageService';
 
 // Declare global types for GAPI and Google Identity Services
 interface TokenClient {
