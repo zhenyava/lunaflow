@@ -16,12 +16,6 @@ const migrateToDailyRecords = (legacyEvents: LegacyCalendarEvent[]): DailyRecord
         record = makeOvulationRecord(event.date, now);
       }
       map.set(event.date, record);
-    } else {
-      if (event.type === 'period') {
-        record.period = {};
-      } else if (event.type === 'ovulation') {
-        record.ovulation = {};
-      }
     }
   });
 

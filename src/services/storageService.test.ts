@@ -23,23 +23,15 @@ describe('storageService', () => {
         { date: '2024-01-01', type: 'period' },
         { date: '2024-01-02', type: 'period' },
         { date: '2024-01-14', type: 'ovulation' },
-        // Same day overlapping (which could theoretically happen if data got mangled)
-        { date: '2024-01-15', type: 'period' },
-        { date: '2024-01-15', type: 'ovulation' }
       ];
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(legacyEvents));
 
       const result = getLocalEvents();
 
-      expect(result).toHaveLength(4);
+      expect(result).toHaveLength(3);
       expect(result[0]).toEqual(makePeriodRecord('2024-01-01'));
+      expect(result[1]).toEqual(makePeriodRecord('2024-01-02'));
       expect(result[2]).toEqual(makeOvulationRecord('2024-01-14'));
-      expect(result[3]).toEqual({
-          date: '2024-01-15',
-          updatedAt: Date.now(),
-          period: {},
-          ovulation: {}
-      });
 
       // Should have saved the migrated data in versioned format
       const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
