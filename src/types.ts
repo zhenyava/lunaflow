@@ -23,7 +23,7 @@ export interface DailyRecord {
    * Data related to ovulation tracking. 
    * If the property exists, it indicates that ovulation was recorded.
    */
-  ovulation?: {};
+  ovulation?: Record<string, never>;
 
   /** 
    * Unix timestamp (milliseconds) of the last time this record was modified.
