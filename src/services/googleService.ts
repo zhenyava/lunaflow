@@ -1,12 +1,6 @@
 import type { DailyRecord, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, SCOPES, FOLDER_NAME } from '../constants';
+import { APP_DATA_FILENAME, FOLDER_NAME } from '../constants';
 import { prepareDataForStorage } from './storageService';
-
-// Declare global types for GAPI and Google Identity Services
-interface TokenClient {
-  callback: (resp: GoogleToken & { error?: unknown }) => Promise<void> | void;
-  requestAccessToken: (options: { prompt: string }) => void;
-}
 
 interface GapiFileResult<T = unknown> {
   result: T;
@@ -31,25 +25,11 @@ interface GapiClient {
 declare global {
   interface Window {
     dataLayer?: Record<string, unknown>[];
-    google: {
-      accounts: {
-        oauth2: {
-          initTokenClient: (config: {
-            client_id: string;
-            scope: string;
-            callback: string | TokenClient['callback'];
-          }) => TokenClient;
-          revoke: (accessToken: string, callback: () => void) => void;
-        };
-      };
-    };
     gapi: GapiClient;
   }
 }
 
-let tokenClient: TokenClient | null = null;
 let gapiInited = false;
-let gisInited = false;
 
 // Initialize the Google API Client
 export const initializeGoogleApi = (
@@ -62,34 +42,16 @@ export const initializeGoogleApi = (
   }
 
   const initGapi = async () => {
-      try {
-        await window.gapi.client.init({
-            discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
-        });
-        gapiInited = true;
-        checkDone();
-      } catch (e: unknown) {
-        console.error("Error initializing GAPI client", e);
-      }
+    try {
+      await window.gapi.client.init({
+          discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"],
+      });
+      gapiInited = true;
+      onInit(true);
+    } catch (e: unknown) {
+      console.error("Error initializing GAPI client", e);
+    }
   };
-
-  const initGis = () => {
-      try {
-        tokenClient = window.google.accounts.oauth2.initTokenClient({
-            client_id: clientId,
-            scope: SCOPES,
-            callback: '', // defined at request time
-        });
-        gisInited = true;
-        checkDone();
-      } catch (e: unknown) {
-        console.error("Error initializing GIS client", e);
-      }
-  }
-
-  const checkDone = () => {
-      if (gapiInited && gisInited) onInit(true);
-  }
 
   // Load GAPI script if not present
   if (!document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
@@ -98,26 +60,13 @@ export const initializeGoogleApi = (
       script1.onload = () => window.gapi.load('client', initGapi);
       document.body.appendChild(script1);
   } else if (window.gapi) {
-      // If script is loaded, ensure client is initialized
       if (!gapiInited) window.gapi.load('client', initGapi);
-      else checkDone();
-  }
-
-  // Load GIS script if not present
-  if (!document.querySelector('script[src="https://accounts.google.com/gsi/client"]')) {
-      const script2 = document.createElement('script');
-      script2.src = "https://accounts.google.com/gsi/client";
-      script2.onload = initGis;
-      document.body.appendChild(script2);
-  } else if (window.google && window.google.accounts) {
-      // If script is loaded, re-init token client with potentially new ID
-      initGis();
+      else onInit(true);
   }
 };
 
 /**
  * Manually sets the token in GAPI client.
- * Used for restoring session from LocalStorage.
  */
 export const restoreGapiSession = (token: GoogleToken) => {
     if (window.gapi && window.gapi.client) {
@@ -126,51 +75,79 @@ export const restoreGapiSession = (token: GoogleToken) => {
 };
 
 /**
- * forceConsent: 
- * - true: Shows the "Allow access" screen
- * - false: Tries to get token (NOTE: In modern browsers this still opens a popup)
+ * Initiates the backend-driven OAuth flow.
+ * Note: This will cause a full page redirect.
  */
-export const signInToGoogle = async (forceConsent: boolean = true): Promise<GoogleToken> => {
-  return new Promise((resolve, reject) => {
-    if (!tokenClient) return reject(new Error('Google Identity Services not initialized'));
+export const signInToGoogle = async (): Promise<void> => {
+    window.location.href = '/api/auth/login';
+    // Return a promise that never resolves so the caller waits for navigation
+    return new Promise(() => {});
+};
 
-    tokenClient.callback = async (resp: GoogleToken & { error?: unknown }) => {
-      if (resp.error) {
-        reject(resp);
-        return;
-      }
-      
-      // CRITICAL FIX: Connect the token from GIS to GAPI
-      // This is required for gapi.client.drive calls to work
-      if (window.gapi && window.gapi.client) {
-          window.gapi.client.setToken(resp);
-      }
+/**
+ * Checks if the current token is expired and automatically refreshes it via the backend.
+ * Called before any Drive API action.
+ */
+export const ensureValidToken = async (): Promise<GoogleToken> => {
+  const storedStr = localStorage.getItem('LUNA_AUTH_TOKEN');
+  if (!storedStr) throw new Error("No token found");
 
-      if (window.dataLayer) {
-        window.dataLayer.push({ event: 'google_drive_auth' });
-      }
+  const token: GoogleToken = JSON.parse(storedStr);
+  const now = Date.now();
 
-      resolve(resp as GoogleToken);
+  // If token is valid and not expiring in the next 5 seconds
+  if (token.expires_at && token.expires_at > now + 5000) {
+    // Make sure GAPI is in sync
+    const currentGapiToken = window.gapi?.client?.getToken();
+    if (!currentGapiToken || currentGapiToken.access_token !== token.access_token) {
+        restoreGapiSession(token);
+    }
+    return token;
+  }
+
+  // Token is expired or about to expire, fetch a new one
+  try {
+    const response = await fetch('/api/auth/refresh');
+    if (!response.ok) {
+      throw new Error(`Refresh failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const expiresAt = Date.now() + (data.expires_in - 30) * 1000;
+    
+    const newToken: GoogleToken = {
+      ...token,
+      access_token: data.access_token,
+      expires_in: data.expires_in,
+      expires_at: expiresAt
     };
 
-    // 'consent' forces the screen, '' (empty) tries to skip it if already granted
-    tokenClient.requestAccessToken({ prompt: forceConsent ? 'consent' : '' });
-  });
+    localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(newToken));
+    restoreGapiSession(newToken);
+
+    if (window.dataLayer) {
+      window.dataLayer.push({ event: 'google_drive_token_refresh' });
+    }
+
+    return newToken;
+  } catch (error) {
+    console.error("Token refresh error", error);
+    // Token is fully dead, wipe it
+    localStorage.removeItem('LUNA_AUTH_TOKEN');
+    if (window.gapi && window.gapi.client) window.gapi.client.setToken(null);
+    throw new Error("Unauthorized");
+  }
 };
+
 
 /**
  * Checks if the data file exists in Drive.
  * If yes, returns the File ID.
  * If no, creates an empty file and returns the new File ID.
- * Now it uses a visible folder instead of appDataFolder.
  */
 export const ensureDriveFileExists = async (): Promise<string> => {
   try {
-    // Ensure we have a token before trying to list files
-    const token = window.gapi.client.getToken();
-    if (!token) {
-        throw new Error("No Google API token found. Please sign in.");
-    }
+    const token = await ensureValidToken();
 
     // 1. Find or create the LunaFlow folder
     let folderId = '';
@@ -183,9 +160,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
     const folders = folderResponse.result.files;
     if (folders && folders.length > 0) {
       folderId = folders[0].id;
-      console.log('Found existing folder:', folderId);
     } else {
-      console.log('Creating new folder...');
       const folderMetadata = {
         name: FOLDER_NAME,
         mimeType: 'application/vnd.google-apps.folder'
@@ -195,7 +170,6 @@ export const ensureDriveFileExists = async (): Promise<string> => {
         fields: 'id'
       });
       folderId = createFolderResponse.result.id;
-      console.log('Created new folder:', folderId);
     }
 
     // 2. Check if file exists inside the folder
@@ -207,14 +181,11 @@ export const ensureDriveFileExists = async (): Promise<string> => {
     });
 
     const files = response.result.files;
-    
     if (files && files.length > 0) {
-      console.log('Found existing file in visible folder:', files[0].id);
       return files[0].id;
     }
 
     // 3. Create file in visible folder
-    console.log('Creating new file in visible folder...');
     const metadata = {
       name: APP_DATA_FILENAME,
       parents: [folderId],
@@ -243,9 +214,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
     }
 
     const result = await createResponse.json();
-    console.log('File created and migrated if necessary:', result.id);
     return result.id;
-
   } catch (error) {
     console.error("Error ensuring drive file exists:", error);
     throw error;
@@ -256,8 +225,7 @@ export const ensureDriveFileExists = async (): Promise<string> => {
  * Uploads data to a specific File ID using PATCH
  */
 export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Promise<void> => {
-  const token = window.gapi.client.getToken();
-  if (!token) throw new Error("No token for upload");
+  const token = await ensureValidToken();
 
   const data = prepareDataForStorage(events);
   const fileContent = JSON.stringify(data);
@@ -287,22 +255,26 @@ export const uploadDriveData = async (fileId: string, events: DailyRecord[]): Pr
 
 export const fetchDriveDataContent = async (fileId: string): Promise<unknown> => {
     try {
+        await ensureValidToken();
         const fileResponse = await window.gapi.client.drive.files.get({
             fileId: fileId,
             alt: 'media'
         });
-        return fileResponse.result; // Returns raw parsed JSON, parsing and migration handled by caller
+        return fileResponse.result; // Returns raw parsed JSON
     } catch (error) {
         console.error("Fetch Content Error", error);
         throw error;
     }
 }
 
-export const revokeToken = () => {
+export const revokeToken = async () => {
     try {
-        const token = window.gapi.client.getToken();
-        if (token) {
-            window.google.accounts.oauth2.revoke(token.access_token, () => {console.log('Revoked')});
+        // Clear HttpOnly cookie on backend
+        await fetch('/api/auth/logout');
+        
+        // Clear local state
+        localStorage.removeItem('LUNA_AUTH_TOKEN');
+        if (window.gapi && window.gapi.client) {
             window.gapi.client.setToken(null);
         }
     } catch(e) {
