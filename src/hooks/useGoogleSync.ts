@@ -10,7 +10,7 @@ import {
   restoreGapiSession
 } from '../services/googleService';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
-import { GOOGLE_CLIENT_ID } from '../constants';
+import { GOOGLE_CLIENT_ID, GOOGLE_SCOPES } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
@@ -40,24 +40,47 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
      return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
   });
 
+  // Extract hash token on mount (from Scenario 1 redirect)
+  useEffect(() => {
+    if (window.location.hash.includes('access_token=')) {
+      const params = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = params.get('access_token');
+      const expiresInStr = params.get('expires_in');
+      
+      if (accessToken && expiresInStr) {
+        const expiresIn = parseInt(expiresInStr, 10);
+        const expiresAt = Date.now() + (expiresIn * 1000);
+        
+        const token: GoogleToken = {
+          access_token: accessToken,
+          expires_in: expiresIn,
+          scope: GOOGLE_SCOPES,
+          token_type: 'Bearer',
+          expires_at: expiresAt
+        };
+        
+        localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(token));
+        
+        // Clean the URL hash
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  }, []);
+
   // Init Google API
   useEffect(() => {
-    if (googleClientId) {
-      initializeGoogleApi(googleClientId, (success) => {
-        if (success) {
-           console.log("Google API Initialized");
-           setIsApiInitialized(true);
-        }
-      });
-    }
-  }, [googleClientId]);
+    initializeGoogleApi((success) => {
+      if (success) {
+         setIsApiInitialized(true);
+      }
+    });
+  }, []);
 
-  const handleLogout = useCallback(() => {
-      revokeToken();
+  const handleLogout = useCallback(async () => {
+      await revokeToken();
       setIsAuthenticated(false);
       setDriveFileId(null);
       setSyncState({ status: 'idle' });
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
   }, []);
 
   // CORE SYNCHRONIZATION LOGIC
@@ -100,28 +123,22 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
         if (storedTokenStr) {
             const token: GoogleToken = JSON.parse(storedTokenStr);
-            const now = Date.now();
             
-            if (token.expires_at && token.expires_at > now + 60000) {
-                restoreGapiSession(token);
-                setTimeout(() => {
-                    setIsAuthenticated(true);
-                    ensureDriveFileExists()
-                        .then(id => {
-                            setDriveFileId(id);
-                            performFullSync(id); 
-                        })
-                        .catch(() => {
-                            handleLogout();
-                        });
-                }, 0);
-            } else {
-                localStorage.removeItem('LUNA_AUTH_TOKEN');
-                setTimeout(() => {
-                    setIsAuthenticated(false);
-                    setSyncState({ status: 'idle' });
-                }, 0);
-            }
+            // If we have a token, restore session immediately
+            // The ensureValidToken logic will handle refresh if it's expired during ensureDriveFileExists
+            restoreGapiSession(token);
+            setTimeout(() => {
+                setIsAuthenticated(true);
+                ensureDriveFileExists()
+                    .then(id => {
+                        setDriveFileId(id);
+                        performFullSync(id); 
+                    })
+                    .catch((err) => {
+                        console.error('Session restore failed', err);
+                        handleLogout();
+                    });
+            }, 0);
         }
     } catch {
         localStorage.removeItem('LUNA_AUTH_TOKEN');
@@ -129,24 +146,10 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync]);
 
   const handleGoogleLogin = async () => {
-    if (!googleClientId) {
-      alert("Please enter a Google Client ID in the settings first.");
-      return;
-    }
-    
     try {
       setSyncState({ status: 'syncing' });
-      const tokenResponse = await signInToGoogle(true);
-      if (tokenResponse && tokenResponse.expires_in) {
-          const expiresAt = Date.now() + (tokenResponse.expires_in * 1000);
-          const tokenToStore: GoogleToken = { ...tokenResponse, expires_at: expiresAt };
-          localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(tokenToStore));
-      }
-      const fileId = await ensureDriveFileExists();
-      setDriveFileId(fileId);
-      setIsAuthenticated(true);
-      await performFullSync(fileId);
-
+      // This will redirect the page, so code after this won't execute normally.
+      await signInToGoogle();
     } catch (error: unknown) {
       setSyncState({ status: 'error' });
       setIsAuthenticated(false);
