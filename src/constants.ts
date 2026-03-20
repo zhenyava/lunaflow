@@ -11,6 +11,8 @@ export const OVULATION_LIGHT_COLOR = 'bg-violet-100 text-violet-700';
 
 export const FOLDER_NAME = 'LunaFlow';
 
+export const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
 /**
  * CLIENT ID CONFIGURATION
  * 

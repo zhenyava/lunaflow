@@ -10,7 +10,7 @@ import {
   restoreGapiSession
 } from '../services/googleService';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
-import { GOOGLE_CLIENT_ID } from '../constants';
+import { GOOGLE_CLIENT_ID, GOOGLE_SCOPES } from '../constants';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
@@ -54,7 +54,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         const token: GoogleToken = {
           access_token: accessToken,
           expires_in: expiresIn,
-          scope: 'https://www.googleapis.com/auth/drive.file',
+          scope: GOOGLE_SCOPES,
           token_type: 'Bearer',
           expires_at: expiresAt
         };
