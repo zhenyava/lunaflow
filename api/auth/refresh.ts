@@ -1,12 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { parse } from 'cookie';
-import { decrypt } from '../utils/encryption.js';
+import { getIronSession } from 'iron-session';
+import { sessionOptions, SessionData } from '../utils/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const cookies = parse(req.headers.cookie || '');
-  const encryptedRefreshToken = cookies.refresh_token;
+  const session = await getIronSession<SessionData>(req, res, sessionOptions);
 
-  if (!encryptedRefreshToken) {
+  if (!session.refreshToken) {
     return res.status(401).json({ error: 'No refresh token available' });
   }
 
@@ -18,15 +17,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const refreshToken = decrypt(encryptedRefreshToken);
-
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         client_id: clientId,
         client_secret: clientSecret,
-        refresh_token: refreshToken,
+        refresh_token: session.refreshToken,
         grant_type: 'refresh_token',
       }),
     });
@@ -37,10 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Google Refresh Error:', data);
       return res.status(tokenResponse.status).json(data);
     }
+    
+    // Apply the 30-second safety buffer on the backend
+    const safe_expires_in = Math.max(0, data.expires_in - 30);
 
     return res.status(200).json({
       access_token: data.access_token,
-      expires_in: data.expires_in,
+      expires_in: safe_expires_in,
     });
   } catch (error) {
     console.error('Refresh error:', error);

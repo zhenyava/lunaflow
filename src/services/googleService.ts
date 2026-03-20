@@ -95,8 +95,8 @@ export const ensureValidToken = async (): Promise<GoogleToken> => {
   const token: GoogleToken = JSON.parse(storedStr);
   const now = Date.now();
 
-  // If token is valid and not expiring in the next 5 seconds
-  if (token.expires_at && token.expires_at > now + 5000) {
+  // The buffer is already subtracted by the backend
+  if (token.expires_at && token.expires_at > now) {
     // Make sure GAPI is in sync
     const currentGapiToken = window.gapi?.client?.getToken();
     if (!currentGapiToken || currentGapiToken.access_token !== token.access_token) {
@@ -113,7 +113,7 @@ export const ensureValidToken = async (): Promise<GoogleToken> => {
     }
 
     const data = await response.json();
-    const expiresAt = Date.now() + (data.expires_in - 30) * 1000;
+    const expiresAt = Date.now() + (data.expires_in * 1000);
     
     const newToken: GoogleToken = {
       ...token,
@@ -133,8 +133,8 @@ export const ensureValidToken = async (): Promise<GoogleToken> => {
   } catch (error) {
     console.error("Token refresh error", error);
     // Token is fully dead, wipe it
-    localStorage.removeItem('LUNA_AUTH_TOKEN');
     if (window.gapi && window.gapi.client) window.gapi.client.setToken(null);
+    localStorage.removeItem('LUNA_AUTH_TOKEN');
     throw new Error("Unauthorized");
   }
 };

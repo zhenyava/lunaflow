@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { serialize } from 'cookie';
-import { encrypt } from '../utils/encryption.js';
+import { getIronSession } from 'iron-session';
+import { sessionOptions, SessionData } from '../utils/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code } = req.query;
@@ -43,22 +43,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { access_token, refresh_token, expires_in } = data;
 
-    // If a refresh token is returned, encrypt it and store it in an HttpOnly cookie
+    // Save refresh token using iron-session
     if (refresh_token) {
-      const encryptedToken = encrypt(refresh_token);
-      const cookieOptions = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        maxAge: 30 * 24 * 60 * 60, // 30 days
-        path: '/api/auth',
-      };
-      
-      res.setHeader('Set-Cookie', serialize('refresh_token', encryptedToken, cookieOptions));
+      const session = await getIronSession<SessionData>(req, res, sessionOptions);
+      session.refreshToken = refresh_token;
+      await session.save();
     }
 
+    // Apply the 30-second safety buffer on the backend
+    const safe_expires_in = Math.max(0, expires_in - 30);
+
     // Redirect to the frontend with the access_token in the URL hash fragment
-    const frontendUrl = `${protocol}://${host}/#access_token=${access_token}&expires_in=${expires_in}`;
+    const frontendUrl = `${protocol}://${host}/#access_token=${access_token}&expires_in=${safe_expires_in}`;
     res.redirect(frontendUrl);
   } catch (error) {
     console.error('Callback error:', error);

@@ -49,7 +49,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
       
       if (accessToken && expiresInStr) {
         const expiresIn = parseInt(expiresInStr, 10);
-        const expiresAt = Date.now() + (expiresIn - 30) * 1000;
+        const expiresAt = Date.now() + (expiresIn * 1000);
         
         const token: GoogleToken = {
           access_token: accessToken,
