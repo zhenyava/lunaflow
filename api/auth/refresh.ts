@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { parse } from 'cookie';
-import { decrypt } from '../utils/encryption';
+import { decrypt } from '../utils/encryption.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const cookies = parse(req.headers.cookie || '');

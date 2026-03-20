@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { serialize } from 'cookie';
-import { encrypt } from '../utils/encryption';
+import { encrypt } from '../utils/encryption.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code } = req.query;
