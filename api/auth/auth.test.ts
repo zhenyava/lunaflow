@@ -4,7 +4,8 @@ import callbackHandler from './callback';
 import refreshHandler from './refresh';
 import logoutHandler from './logout';
 import { createRequest, createResponse } from 'node-mocks-http';
-import { getIronSession } from 'iron-session';
+import { getIronSession, IronSession } from 'iron-session';
+import { SessionData } from '../utils/session.js';
 
 vi.mock('iron-session', () => ({
   getIronSession: vi.fn(),
@@ -43,8 +44,8 @@ describe('Backend Auth Handlers', () => {
       const res = createResponse();
       res.redirect = vi.fn();
 
-      const mockSession = { save: vi.fn() };
-      vi.mocked(getIronSession).mockResolvedValue(mockSession as any);
+      const mockSession = { save: vi.fn() } as unknown as IronSession<SessionData>;
+      vi.mocked(getIronSession).mockResolvedValue(mockSession);
 
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
@@ -70,8 +71,8 @@ describe('Backend Auth Handlers', () => {
       const req = createRequest({ method: 'GET' });
       const res = createResponse();
 
-      const mockSession = { refreshToken: 'stored-ref-token', save: vi.fn() };
-      vi.mocked(getIronSession).mockResolvedValue(mockSession as any);
+      const mockSession = { refreshToken: 'stored-ref-token', save: vi.fn() } as unknown as IronSession<SessionData>;
+      vi.mocked(getIronSession).mockResolvedValue(mockSession);
 
       vi.mocked(fetch).mockResolvedValue({
         ok: true,
@@ -94,7 +95,7 @@ describe('Backend Auth Handlers', () => {
       const req = createRequest({ method: 'GET' });
       const res = createResponse();
 
-      vi.mocked(getIronSession).mockResolvedValue({} as any);
+      vi.mocked(getIronSession).mockResolvedValue({} as unknown as IronSession<SessionData>);
 
       await refreshHandler(req, res);
 
@@ -107,8 +108,8 @@ describe('Backend Auth Handlers', () => {
       const req = createRequest({ method: 'GET' });
       const res = createResponse();
 
-      const mockSession = { destroy: vi.fn() };
-      vi.mocked(getIronSession).mockResolvedValue(mockSession as any);
+      const mockSession = { destroy: vi.fn() } as unknown as IronSession<SessionData>;
+      vi.mocked(getIronSession).mockResolvedValue(mockSession);
 
       await logoutHandler(req, res);
 
