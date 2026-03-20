@@ -33,14 +33,8 @@ let gapiInited = false;
 
 // Initialize the Google API Client
 export const initializeGoogleApi = (
-  clientId: string,
   onInit: (success: boolean) => void
 ) => {
-  if (!clientId) {
-    onInit(false);
-    return;
-  }
-
   const initGapi = async () => {
     try {
       await window.gapi.client.init({
@@ -50,6 +44,7 @@ export const initializeGoogleApi = (
       onInit(true);
     } catch (e: unknown) {
       console.error("Error initializing GAPI client", e);
+      onInit(false);
     }
   };
 

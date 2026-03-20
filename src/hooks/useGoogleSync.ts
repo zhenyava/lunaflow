@@ -69,14 +69,12 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
 
   // Init Google API
   useEffect(() => {
-    if (googleClientId) {
-      initializeGoogleApi(googleClientId, (success) => {
-        if (success) {
-           setIsApiInitialized(true);
-        }
-      });
-    }
-  }, [googleClientId]);
+    initializeGoogleApi((success) => {
+      if (success) {
+         setIsApiInitialized(true);
+      }
+    });
+  }, []);
 
   const handleLogout = useCallback(async () => {
       await revokeToken();
@@ -148,11 +146,6 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync]);
 
   const handleGoogleLogin = async () => {
-    if (!googleClientId) {
-      alert("Please enter a Google Client ID in the settings first.");
-      return;
-    }
-    
     try {
       setSyncState({ status: 'syncing' });
       // This will redirect the page, so code after this won't execute normally.
