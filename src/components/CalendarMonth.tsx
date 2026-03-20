@@ -10,6 +10,7 @@ interface CalendarMonthProps {
   predictedDates?: Set<string>;
   predictedOvulationDates?: Set<string>;
   onDayClick?: (date: Date) => void;
+  selectedDate?: Date | null;
   className?: string;
 }
 
@@ -19,17 +20,20 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   predictedDates,
   predictedOvulationDates,
   onDayClick,
+  selectedDate,
   className = '' 
 }) => {
   // Memoize dates calculation to prevent unnecessary work on every render
-  const { periodDates, ovulationDates, predicted, predictedOvulation } = React.useMemo(() => {
+  const { 
+    periodLight, periodMedium, periodHeavy, periodSpotting, 
+    ovulationDates, predicted, predictedOvulation
+  } = React.useMemo(() => {
     return {
-      periodDates: events
-        .filter(e => !!e.period)
-        .map(e => parseISO(e.date)),
-      ovulationDates: events
-        .filter(e => !!e.ovulation)
-        .map(e => parseISO(e.date)),
+      periodLight: events.filter(e => e.period?.intensity === 'light').map(e => parseISO(e.date)),
+      periodMedium: events.filter(e => e.period && (!e.period.intensity || e.period.intensity === 'medium')).map(e => parseISO(e.date)),
+      periodHeavy: events.filter(e => e.period?.intensity === 'heavy').map(e => parseISO(e.date)),
+      periodSpotting: events.filter(e => e.period?.intensity === 'spotting').map(e => parseISO(e.date)),
+      ovulationDates: events.filter(e => !!e.ovulation).map(e => parseISO(e.date)),
       predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
       predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))
     };
@@ -43,15 +47,23 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         disableNavigation
         hideNavigation
         onDayClick={onDayClick}
+        selected={selectedDate || undefined}
         modifiers={{
-          period: periodDates,
+          period_light: periodLight,
+          period_medium: periodMedium,
+          period_heavy: periodHeavy,
+          period_spotting: periodSpotting,
           ovulation: ovulationDates,
           predicted: predicted,
           predictedOvulation: predictedOvulation
         }}
         modifiersClassNames={{
           today: "[&_button]:border-2 [&_button]:border-slate-300 [&_button]:font-bold",
-          period: "[&_button]:bg-rose-500 [&_button]:text-white",
+          selected: "[&_button]:ring-2 [&_button]:ring-slate-800 [&_button]:ring-offset-2",
+          period_light: "[&_button]:bg-rose-300 [&_button]:text-white",
+          period_medium: "[&_button]:bg-rose-500 [&_button]:text-white",
+          period_heavy: "[&_button]:bg-rose-700 [&_button]:text-white",
+          period_spotting: "[&_button]:bg-rose-100 [&_button]:text-rose-700",
           ovulation: "[&_button]:bg-violet-500 [&_button]:text-white",
           predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
           predictedOvulation: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-violet-300 [&_button]:text-violet-500 [&_button]:bg-violet-50"

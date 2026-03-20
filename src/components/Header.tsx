@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, type LucideIcon } from 'lucide-react';
+import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 
@@ -19,6 +19,10 @@ interface HeaderProps {
     googleClientId: string;
     setGoogleClientId: (id: string) => void;
     onLogout: () => void;
+
+    // Edit Mode Props
+    isEditMode: boolean;
+    setIsEditMode: (edit: boolean) => void;
 }
 
 interface TypeToggleButtonProps {
@@ -33,14 +37,14 @@ interface TypeToggleButtonProps {
 const TypeToggleButton = ({ type, label, icon: Icon, colorClass, activeType, setActiveType }: TypeToggleButtonProps) => (
     <button
         onClick={() => setActiveType(type)}
-        className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium text-sm transition-all duration-200 ${
+        className={`px-4 py-2 rounded-lg flex items-center justify-center gap-2 font-medium text-sm transition-all duration-200 ${
             activeType === type 
             ? `${colorClass} text-white shadow-md` 
             : 'bg-white text-gray-500 hover:bg-gray-50 border border-gray-200'
         }`}
     >
         <Icon size={16} fill={activeType === type ? "currentColor" : "none"} />
-        {label}
+        <span>{label}</span>
     </button>
 );
 
@@ -57,7 +61,9 @@ export default function Header({
     setSettingsOpen,
     googleClientId,
     setGoogleClientId,
-    onLogout
+    onLogout,
+    isEditMode,
+    setIsEditMode
 }: HeaderProps) {
     const navigate = useNavigate();
 
@@ -88,26 +94,41 @@ export default function Header({
     
                    {/* Desktop Type Toggles */}
                    <div className="hidden md:flex gap-2">
-                        <TypeToggleButton 
-                            type="period" 
-                            label="Period" 
-                            icon={Droplet} 
-                            colorClass="bg-rose-500" 
-                            activeType={activeType}
-                            setActiveType={setActiveType}
-                        />
-                        <TypeToggleButton 
-                            type="ovulation" 
-                            label="Ovulation" 
-                            icon={Sparkles} 
-                            colorClass="bg-violet-500" 
-                            activeType={activeType}
-                            setActiveType={setActiveType}
-                        />
+                        {isEditMode && (
+                            <>
+                                <TypeToggleButton 
+                                    type="period" 
+                                    label="Period" 
+                                    icon={Droplet} 
+                                    colorClass="bg-rose-500" 
+                                    activeType={activeType}
+                                    setActiveType={setActiveType}
+                                />
+                                <TypeToggleButton 
+                                    type="ovulation" 
+                                    label="Ovulation" 
+                                    icon={Sparkles} 
+                                    colorClass="bg-violet-500" 
+                                    activeType={activeType}
+                                    setActiveType={setActiveType}
+                                />
+                            </>
+                        )}
                    </div>
                    </div>
                    
                    <div className="flex gap-2 items-center">
+                        <button
+                            onClick={() => setIsEditMode(!isEditMode)}
+                            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                                isEditMode 
+                                    ? 'bg-slate-800 text-white shadow-sm' 
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            <Edit3 size={16} />
+                            <span>{isEditMode ? 'Done Editing' : 'Edit Dates'}</span>
+                        </button>
                         <button 
                             onClick={() => isAuthenticated ? onSync() : onLogin()}
                             className={`p-2 rounded-full transition-colors ${isAuthenticated ? 'hover:bg-green-50' : 'hover:bg-gray-100'}`}

@@ -9,6 +9,7 @@ LunaFlow is a privacy-focused menstrual cycle and ovulation tracking web applica
 ## Development Commands
 
 ### Core Commands
+
 ```bash
 npm run dev          # Start development server (http://localhost:5173)
 npm run build        # Type check + production build
@@ -18,6 +19,7 @@ npm run preview      # Preview production build
 ```
 
 ### Testing Commands
+
 ```bash
 npm run test                    # Run all tests once
 npm run test -- --watch         # Run tests in watch mode
@@ -28,12 +30,14 @@ npm run test -- -t "test name"  # Run specific test by name
 ## Code Style Guidelines
 
 ### TypeScript Configuration
+
 - **Strict mode enabled** with comprehensive linting
 - **Target**: ES2022 with modern module resolution
 - **No unused locals/parameters** allowed
 - **JSX**: React-jsx transform (no React imports needed for JSX)
 
 ### Import Organization
+
 ```typescript
 // 1. React hooks and libraries
 import { useState, useEffect } from 'react';
@@ -46,6 +50,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 ```
 
 ### Component Structure
+
 ```typescript
 // 1. Imports (React, external libraries, local imports)
 // 2. Constants and interfaces
@@ -56,6 +61,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 ```
 
 ### Naming Conventions
+
 - **Components**: PascalCase (e.g., `CalendarApp`, `MobileCalendarView`)
 - **Hooks**: camelCase with `use` prefix (e.g., `useCalendarEvents`, `useCycleStats`)
 - **Services**: camelCase (e.g., `statsService`, `storageService`)
@@ -63,18 +69,21 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 - **Types**: PascalCase for interfaces/types (e.g., `CalendarEvent`, `EventType`)
 
 ### State Management Patterns
+
 - Use **custom hooks** for complex state logic
 - Separate **UI state** from **data state**
 - Local storage persistence handled in hooks/services layer
 - Prefer `useCallback` for event handlers passed to children
 
 ### Error Handling
+
 - Use **try-catch blocks** for async operations in services
 - Return `null` or `undefined` for invalid states rather than throwing
 - Implement proper error boundaries for React components
 - Console.error for debugging, user-friendly messages for UI
 
 ### File Organization
+
 ```
 src/
 ├── components/     # React components (UI layer)
@@ -83,11 +92,17 @@ src/
 ├── pages/         # Route-level components
 ├── types.ts       # TypeScript definitions
 └── constants.ts   # App constants
+docs/
+- AUTH_ARCHITECTURE.md # describes auth logic, architecture and scenarios 
+- STORAGE_ARCHITECTURE.md # describes how we keep user data
+- CALCULATION_LOGIC.md # describes ovulation and period calculation logic
+- LAYOUT_ARCHITECTURE.md # describes HTML layout architecture, read it before make any visual changes in layouts
 ```
 
 ## Testing Guidelines
 
 ### Test Structure (Vitest)
+
 ```typescript
 import { describe, it, expect } from 'vitest';
 import { functionToTest } from './service';
@@ -111,6 +126,7 @@ describe('serviceName', () => {
 ```
 
 ### Testing Best Practices
+
 - Test **business logic** in services, not UI components
 - Use **factory functions** for test data creation
 - Cover **edge cases** and error conditions
@@ -120,30 +136,35 @@ describe('serviceName', () => {
 ## Architecture Patterns
 
 ### Service Layer
+
 - **Pure functions** for calculations (statsService)
 - **Async operations** for external APIs (googleService)
 - **Storage abstraction** (storageService)
 
 ### Custom Hooks
+
 - **State management** with localStorage persistence
 - **API integration** with loading/error states
 - **Computed values** using useMemo
 
 ### Component Patterns
+
 - **Mobile-first** responsive design
-- **Separate mobile/desktop views** when needed
+- **Separate mobile/desktop views** when needed (e.g., Floating Action Buttons and Bottom Sheets for mobile)
 - **Props drilling** avoided with context/hooks
 - **Controlled components** for forms
 
 ## Privacy & Security Guidelines
 
 ### Data Handling
+
 - **Local-first**: Default to localStorage, not external APIs
 - **Optional sync**: Google Drive is opt-in only
 - **No tracking**: Avoid analytics or external scripts
 - **Environment variables**: Use `.env` for sensitive config
 
 ### Google Drive Integration
+
 - **App-specific folder**: Only access `LunaFlow` folder
 - **Minimal scope**: Request only necessary permissions
 - **Token management**: Handle expiration and refresh securely
@@ -151,6 +172,7 @@ describe('serviceName', () => {
 ## Linting & Code Quality
 
 ### ESLint Configuration
+
 - **React Hooks**: Enforce rules of hooks
 - **React Refresh**: Enable HMR in development
 - **TypeScript**: Strict type checking
@@ -159,6 +181,7 @@ describe('serviceName', () => {
 ### CI Pipeline
 
 A GitHub Actions workflow (`.github/workflows/ci.yml`) is set up to automatically run the following checks on every pull request to the `main` branch:
+
 1. `npm run lint` - static analysis
 2. `npm run test` - unit tests
 3. `npm run build` - build verification
@@ -166,6 +189,7 @@ A GitHub Actions workflow (`.github/workflows/ci.yml`) is set up to automaticall
 These checks are sequential and must pass before a PR can be merged.
 
 ### Before Committing
+
 1. Run `npm run lint` - fix all ESLint errors
 2. Run `npm run test` - ensure all tests pass
 3. Run `npm run build` - verify production build works
@@ -174,6 +198,7 @@ These checks are sequential and must pass before a PR can be merged.
 ## Development Workflow
 
 ### Adding New Features
+
 1. Define types in `types.ts` if needed
 2. Implement business logic in `services/`
 3. Create custom hook in `hooks/` for state management
@@ -182,6 +207,7 @@ These checks are sequential and must pass before a PR can be merged.
 6. Update routing if needed
 
 ### Debugging Tips
+
 - Check **localStorage** for data persistence issues
 - Verify **Google API configuration** for sync problems
 - Use **React DevTools** for component state debugging
@@ -194,3 +220,4 @@ These checks are sequential and must pass before a PR can be merged.
 - **Mobile scroll**: Use virtualization for long month lists
 - **Type safety**: Import types with `import type { ... }`
 - **Environment**: Use `VITE_` prefix for environment variables
+

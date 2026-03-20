@@ -35,12 +35,14 @@ export function useCalendarEvents() {
                 delete newRecord.period;
             } else {
                 newRecord.period = {};
+                delete newRecord.ovulation;
             }
         } else if (activeType === 'ovulation') {
             if (newRecord.ovulation) {
                 delete newRecord.ovulation;
             } else {
                 newRecord.ovulation = {};
+                delete newRecord.period;
             }
         }
 
@@ -75,12 +77,56 @@ export function useCalendarEvents() {
     });
   }, [activeType]);
 
+  const updateRecord = useCallback((dateStr: string, updates: Partial<DailyRecord>) => {
+    setRecords(prev => {
+      const existingIdx = prev.findIndex(e => e.date === dateStr);
+      const now = Date.now();
+
+      if (existingIdx >= 0) {
+        const newRecord = { ...prev[existingIdx], ...updates, updatedAt: now };
+        
+        // Check if there's any data left
+        const hasPeriod = !!newRecord.period;
+        const hasOvulation = !!newRecord.ovulation;
+        // In the future, check for symptoms here too
+        
+        if (!hasPeriod && !hasOvulation) {
+            newRecord.isDeleted = true;
+        } else {
+            newRecord.isDeleted = false;
+        }
+
+        const newRecords = [...prev];
+        newRecords[existingIdx] = newRecord;
+        return newRecords;
+      } else {
+        // Create new record
+        const newRecord: DailyRecord = {
+          date: dateStr,
+          updatedAt: now,
+          isDeleted: false,
+          ...updates
+        };
+        
+        const hasPeriod = !!newRecord.period;
+        const hasOvulation = !!newRecord.ovulation;
+        
+        if (!hasPeriod && !hasOvulation) {
+            newRecord.isDeleted = true;
+        }
+
+        return [...prev, newRecord].sort((a, b) => a.date.localeCompare(b.date));
+      }
+    });
+  }, []);
+
   return {
     events: activeEvents,    // Clean events for UI
     allRecords: records,     // Raw records for Sync
     setEvents: setRecords,   // Updater for Sync
     activeType,
     setActiveType,
-    handleDayClick
+    handleDayClick,
+    updateRecord
   };
 }

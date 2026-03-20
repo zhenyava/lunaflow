@@ -8,6 +8,7 @@ interface MobileCalendarViewProps {
     predictedDates: Set<string>;
     predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;
+    selectedDate?: Date | null;
 }
 
 export default function MobileCalendarView({
@@ -15,7 +16,8 @@ export default function MobileCalendarView({
     events,
     predictedDates,
     predictedOvulationDates,
-    onDayClick
+    onDayClick,
+    selectedDate
 }: MobileCalendarViewProps) {
     return (
         <div className="md:hidden py-8 px-4 min-h-screen">
@@ -29,6 +31,7 @@ export default function MobileCalendarView({
                             predictedDates={predictedDates}
                             predictedOvulationDates={predictedOvulationDates}
                             onDayClick={onDayClick} 
+                            selectedDate={selectedDate}
                         />
                     </div>
                 )

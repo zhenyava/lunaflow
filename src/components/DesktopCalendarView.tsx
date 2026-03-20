@@ -11,6 +11,7 @@ interface DesktopCalendarViewProps {
     predictedDates: Set<string>;
     predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;
+    selectedDate?: Date | null;
 }
 
 export default function DesktopCalendarView({
@@ -21,7 +22,8 @@ export default function DesktopCalendarView({
     events,
     predictedDates,
     predictedOvulationDates,
-    onDayClick
+    onDayClick,
+    selectedDate
 }: DesktopCalendarViewProps) {
     return (
         <div className="hidden md:flex flex-col h-full py-4 px-4 w-full">
@@ -59,6 +61,7 @@ export default function DesktopCalendarView({
                                 predictedOvulationDates={predictedOvulationDates}
                                 onDayClick={onDayClick}
                                 className="h-full w-full min-h-0"
+                                selectedDate={selectedDate}
                             />
                         </div>
                     ))}
