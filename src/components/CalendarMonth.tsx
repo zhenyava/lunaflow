@@ -36,7 +36,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   }, [events, predictedDates, predictedOvulationDates]);
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full h-full min-h-0 flex flex-col ${className}`}>
       <DayPicker
         month={month}
         onMonthChange={() => {}} 
@@ -56,11 +56,27 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
           predictedOvulation: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-violet-300 [&_button]:text-violet-500 [&_button]:bg-violet-50"
         }}
+        components={{
+          MonthGrid: (props) => <div {...props} />,
+          Weeks: (props) => <div {...props} />,
+          Week: (props) => <div {...props} />,
+          Day: (props) => <div {...props} />,
+          Weekdays: (props) => <div {...props} />,
+          Weekday: (props) => <div {...props} />,
+        }}
         classNames={{
-          month_grid: "w-full table-fixed",
-          day: "p-0.5",
-          // Removed transition-colors to eliminate perceived lag on click
-          day_button: "w-full aspect-square flex items-center justify-center rounded-full",
+          root: "w-full h-full flex flex-col p-1 sm:p-2",
+          months: "w-full h-full flex flex-col flex-1 min-h-0",
+          month: "flex flex-col h-full w-full flex-1",
+          caption: "flex justify-center items-center pb-2 flex-none h-[15%]",
+          caption_label: "text-sm md:text-base lg:text-lg font-medium text-slate-900",
+          month_grid: "w-full flex-1 flex flex-col h-[85%]",
+          weekdays: "flex w-full h-[14.28%]",
+          weekday: "text-slate-500 w-[14.28%] font-normal text-[10px] md:text-xs uppercase flex items-center justify-center",
+          weeks: "flex w-full flex-col h-[85.72%]",
+          week: "flex w-full h-[16.66%]",
+          day: "w-[14.28%] h-full flex items-center justify-center p-0",
+          day_button: "relative w-[85%] h-[85%] max-w-[3rem] max-h-[3rem] aspect-square flex items-center justify-center rounded-full text-xs sm:text-sm md:text-base p-0 m-auto",
         }}
       />
     </div>
