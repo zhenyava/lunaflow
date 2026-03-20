@@ -18,7 +18,7 @@ Located in `/api/auth/`, these functions handle the "secure" part of OAuth.
 ### 2. Session Management (`iron-session`)
 We use `iron-session` to manage a stateless, encrypted, `HttpOnly` cookie named `lunaflow_auth_session`.
 - **Security**: The `refresh_token` is never sent to the frontend. It stays encrypted in the cookie, protected from XSS.
-- **Duration**: The session is valid for 30 days.
+- **Rolling Sessions**: The session is valid for 30 days. This timer is **reset** every time the user visits the app and a token refresh occurs (Scenario 2). This means the user only needs to re-authenticate if they are inactive for more than 30 consecutive days.
 
 ### 3. Frontend Service (`googleService.ts`)
 - **`ensureValidToken()`**: A proactive interceptor that checks the token TTL before every Google Drive API call.
