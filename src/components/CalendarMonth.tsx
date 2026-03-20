@@ -49,7 +49,6 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         onDayClick={onDayClick}
         selected={selectedDate || undefined}
         showOutsideDays
-        fixedWeeks
         modifiers={{
           period_light: periodLight,
           period_medium: periodMedium,
@@ -88,7 +87,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           weekdays: "flex w-full h-[14.28%]",
           weekday: "text-slate-500 w-[14.28%] font-normal text-[10px] md:text-xs uppercase flex items-center justify-center",
           weeks: "flex w-full flex-col h-[85.72%]",
-          week: "flex w-full h-[16.66%]",
+          week: "flex w-full flex-1",
           day: "w-[14.28%] h-full flex items-center justify-center p-0",
           day_button: "relative w-[85%] h-[85%] max-w-[3rem] max-h-[3rem] aspect-square flex items-center justify-center rounded-full text-xs sm:text-sm md:text-base p-0 m-auto",
           outside: "opacity-40 [&_button]:text-slate-400",
