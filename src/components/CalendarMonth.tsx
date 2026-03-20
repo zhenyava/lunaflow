@@ -65,16 +65,18 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           Weekday: (props) => <div {...props} />,
         }}
         classNames={{
-          month: "flex flex-col h-full min-h-0 w-full p-0",
-          caption: "flex justify-center pt-0.5 relative items-center mb-0.5 flex-none h-7",
-          caption_label: "text-[min(13px,_3vh)] font-medium text-slate-900",
-          month_grid: "w-full flex-1 h-full flex flex-col min-h-0 overflow-hidden",
-          weekdays: "flex w-full flex-none h-6",
-          weekday: "text-slate-500 flex-1 font-normal text-[min(10px,_2.5vh)] uppercase flex items-center justify-center h-full",
-          weeks: "flex-1 flex flex-col min-h-0",
-          week: "flex w-full flex-1 min-h-0",
-          day: "relative p-0 flex-1 flex items-center justify-center min-h-0",
-          day_button: "relative max-h-full max-w-full aspect-square flex items-center justify-center rounded-full text-[min(14px,_3.5vh)] p-0 m-auto",
+          root: "w-full h-full flex flex-col p-1 sm:p-2",
+          months: "w-full h-full flex flex-col flex-1 min-h-0",
+          month: "flex flex-col h-full w-full flex-1",
+          caption: "flex justify-center items-center pb-2 flex-none h-[15%]",
+          caption_label: "text-sm md:text-base lg:text-lg font-medium text-slate-900",
+          month_grid: "w-full flex-1 flex flex-col h-[85%]",
+          weekdays: "flex w-full h-[14.28%]",
+          weekday: "text-slate-500 w-[14.28%] font-normal text-[10px] md:text-xs uppercase flex items-center justify-center",
+          weeks: "flex w-full flex-col h-[85.72%]",
+          week: "flex w-full h-[16.66%]",
+          day: "w-[14.28%] h-full flex items-center justify-center p-0",
+          day_button: "relative w-[85%] h-[85%] max-w-[3rem] max-h-[3rem] aspect-square flex items-center justify-center rounded-full text-xs sm:text-sm md:text-base p-0 m-auto",
         }}
       />
     </div>
