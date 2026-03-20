@@ -1,0 +1,7 @@
+api/**/*.spec.ts
+api/**/*.test.ts
+node_modules
+dist
+.git
+.github
+screenshots
