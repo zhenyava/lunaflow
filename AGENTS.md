@@ -36,34 +36,8 @@ npm run test -- -t "test name"  # Run specific test by name
 - **No unused locals/parameters** allowed
 - **JSX**: React-jsx transform (no React imports needed for JSX)
 
-### Import Organization
-
-```typescript
-// 1. React hooks and libraries
-import { useState, useEffect } from 'react';
-import { format, addDays } from 'date-fns';
-
-// 2. Local imports (type imports first)
-import type { CalendarEvent, EventType } from '../types';
-import { getLocalEvents } from '../services/storageService';
-import { useCalendarEvents } from '../hooks/useCalendarEvents';
-```
-
-### Component Structure
-
-```typescript
-// 1. Imports (React, external libraries, local imports)
-// 2. Constants and interfaces
-// 3. Component function
-// 4. State declarations (grouped by purpose)
-// 5. Effects and callbacks
-// 6. Render logic
-```
-
 ### Naming Conventions
 
-- **Components**: PascalCase (e.g., `CalendarApp`, `MobileCalendarView`)
-- **Hooks**: camelCase with `use` prefix (e.g., `useCalendarEvents`, `useCycleStats`)
 - **Services**: camelCase (e.g., `statsService`, `storageService`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `INITIAL_START_DATE`, `LAUNCHED_KEY`)
 - **Types**: PascalCase for interfaces/types (e.g., `CalendarEvent`, `EventType`)
@@ -92,38 +66,17 @@ src/
 ├── pages/         # Route-level components
 ├── types.ts       # TypeScript definitions
 └── constants.ts   # App constants
-docs/
-- AUTH_ARCHITECTURE.md # describes auth logic, architecture and scenarios 
-- STORAGE_ARCHITECTURE.md # describes how we keep user data
-- CALCULATION_LOGIC.md # describes ovulation and period calculation logic
-- LAYOUT_ARCHITECTURE.md # describes HTML layout architecture, read it before make any visual changes in layouts
 ```
+
+### Documentation: When to read what
+
+- **`docs/features.md`**: Product Requirements Document (PRD). Read this to understand the product requirements, features, and business rules. Update this when adding or changing application features.
+- **`docs/AUTH_ARCHITECTURE.md`**: Read for Google OAuth flow, token lifecycle, and session management.
+- **`docs/STORAGE_ARCHITECTURE.md`**: Read for local storage logic, data envelope structure, and migrations.
+- **`docs/CALCULATION_LOGIC.md`**: Read for the mathematical logic behind cycle averages and future date predictions.
+- **`docs/LAYOUT_ARCHITECTURE.md`**: Read for CSS Grid/Flexbox structures, responsive breakpoints, UI component hierarchy, and mobile interaction flows.
 
 ## Testing Guidelines
-
-### Test Structure (Vitest)
-
-```typescript
-import { describe, it, expect } from 'vitest';
-import { functionToTest } from './service';
-
-describe('serviceName', () => {
-  const createTestData = (params) => ({ /* test data */ });
-
-  describe('functionName', () => {
-    it('should handle expected case', () => {
-      // Arrange
-      const input = createTestData('valid');
-      
-      // Act
-      const result = functionToTest(input);
-      
-      // Assert
-      expect(result).toBe(expected);
-    });
-  });
-});
-```
 
 ### Testing Best Practices
 

@@ -1,61 +1,25 @@
-# Features Specification
+# LunaFlow Product Requirements & Features
 
-## Mobile Calendar Interaction & Editing UI
+This document serves as the Product Requirements Document (PRD) for LunaFlow. It describes the application's core functions and business rules from a product perspective. When adding or modifying features, update this document.
 
-### 1. Overview
-The mobile version of LunaFlow utilizes a touch-friendly, bottom-heavy interface design. To maximize screen real estate for the calendar grid, primary actions and details are handled via a Floating Action Button (FAB) and Bottom Sheets.
+## 1. Privacy & Data Storage
+- **Local-First Default:** All user data (cycle logs, settings) must be stored locally on the device (via `localStorage`) by default.
+- **Zero Tracking:** The application must not use external databases, analytics trackers, or third-party cookies that compromise user privacy.
 
-### 2. Core States
-The UI behavior is driven by three primary states managed in `CalendarApp.tsx`:
-- `selectedDate` (`Date | null`): The currently tapped date for viewing details.
-- `isEditMode` (`boolean`): Whether the user is actively painting/toggling events on the calendar.
-- `activeType` (`'period' | 'ovulation'`): The type of event currently selected for painting during Edit Mode.
+## 2. Google Drive Synchronization (Optional)
+- **Opt-in Backup:** Users can optionally link their Google Drive to sync and backup their data.
+- **App-Specific Folder:** The sync must only request permissions for and access an app-specific `LunaFlow` folder. It must not have access to the user's general Google Drive files.
+- **Seamless Merge:** Data from multiple devices synced to the same Google account should be merged intelligently without data loss.
 
-### 3. User Flows
+## 3. Cycle & Ovulation Tracking
+- **Period Logging:** Users can select any day on the calendar and toggle it as a "Period" day.
+- **Ovulation Logging:** Users can select any day on the calendar and mark it as an "Ovulation" day.
+- **Batch Editing:** Users should be able to quickly toggle multiple days sequentially without excessive clicks (e.g., via an "Edit Mode").
 
-#### Flow A: Viewing Day Details (Default Mode)
-- **Initial State:** `isEditMode` is `false`, `selectedDate` is `null`.
-- **UI Elements:** The "Edit Dates" FAB is visible at the bottom center of the screen.
-- **Action:** User taps a specific day on the calendar.
-- **Result:**
-  1. `selectedDate` is set to the tapped date.
-  2. The FAB is hidden (to prevent UI overlap).
-  3. The `DayDetailsPanel` slides up from the bottom (Bottom Sheet).
-  4. A semi-transparent backdrop (`bg-black/20`) appears behind the panel. Tapping the backdrop dismisses the panel (`selectedDate` becomes `null`).
+## 4. Smart Predictions
+- **Averages Calculation:** The app calculates the user's average cycle length and average period duration based on historical logs. Outliers (e.g., unusually long gaps) should be ignored in the average calculation.
+- **Future Projections:** Based on the calculated averages, the app predicts and highlights future expected periods and ovulation windows on the calendar.
 
-#### Flow B: Batch Editing Dates (Edit Mode)
-- **Initial State:** `isEditMode` is `false`, `selectedDate` is `null`.
-- **Action:** User taps the "Edit Dates" FAB.
-- **Result:**
-  1. `isEditMode` is set to `true`.
-  2. The FAB is hidden.
-  3. The `MobileControls` panel slides up from the bottom.
-  4. The user can select the event type ("Period" or "Ovulation") from the `MobileControls` panel.
-  5. Tapping days on the calendar now directly toggles the selected event type for those days (batch editing/painting), rather than opening the details panel.
-- **Exit Action:** User taps "Done Editing" on the `MobileControls` panel.
-- **Exit Result:** `isEditMode` is set to `false`, `MobileControls` hides, and the FAB reappears.
-
-### 4. Components Involved
-
-#### `CalendarApp.tsx`
-- Acts as the state controller.
-- Conditionally renders the FAB, `DayDetailsPanel`, and `MobileControls` based on the current state.
-- Handles the `onDayClick` routing (either setting `selectedDate` or toggling the event if in edit mode).
-
-#### `MobileControls.tsx`
-- A fixed bottom sheet (`footer`) visible only in edit mode.
-- Contains toggle buttons for `activeType` ('period' | 'ovulation') and a "Done Editing" button.
-- Styled with `backdrop-blur`, safe-area padding (`safe-area-pb`), and shadows to float above the calendar content.
-
-#### `DayDetailsPanel.tsx`
-- A fixed bottom sheet for viewing/editing a single day's details.
-- Includes animations (`animate-in slide-in-from-bottom-4`).
-
-### 5. UI/UX Specifications
-- **Animations:** Smooth transitions using Tailwind's `animate-in`, `slide-in-from-bottom-4`, and `fade-in`.
-- **Accessibility/Ergonomics:** All interactive elements in the bottom sheets and FAB are sized appropriately for touch targets (padding `p-3`, icons `20px`, text `text-sm font-medium`).
-- **Z-Index Hierarchy:**
-  - Calendar Grid: Base (`z-0`)
-  - FAB: `z-30`
-  - Backdrop: `z-40`
-  - Bottom Sheets (`DayDetailsPanel`, `MobileControls`): `z-50`
+## 5. Responsive Views
+- **Desktop View:** On larger screens, the calendar should display in a comprehensive year-view (e.g., a grid of months) that fits within the viewport.
+- **Mobile View:** On small screens, the UI must adapt to a mobile-native feel featuring a single-column, infinite vertical scroll, relying on bottom sheets and floating action buttons for interactions.
