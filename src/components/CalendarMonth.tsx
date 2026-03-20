@@ -36,7 +36,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   }, [events, predictedDates, predictedOvulationDates]);
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full h-full min-h-0 flex flex-col ${className}`}>
       <DayPicker
         month={month}
         onMonthChange={() => {}} 
@@ -56,11 +56,25 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
           predictedOvulation: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-violet-300 [&_button]:text-violet-500 [&_button]:bg-violet-50"
         }}
+        components={{
+          MonthGrid: (props) => <div {...props} />,
+          Weeks: (props) => <div {...props} />,
+          Week: (props) => <div {...props} />,
+          Day: (props) => <div {...props} />,
+          Weekdays: (props) => <div {...props} />,
+          Weekday: (props) => <div {...props} />,
+        }}
         classNames={{
-          month_grid: "w-full table-fixed",
-          day: "p-0.5",
-          // Removed transition-colors to eliminate perceived lag on click
-          day_button: "w-full aspect-square flex items-center justify-center rounded-full",
+          month: "flex flex-col h-full min-h-0 w-full p-0",
+          caption: "flex justify-center pt-0.5 relative items-center mb-0.5 flex-none h-7",
+          caption_label: "text-[min(13px,_3vh)] font-medium text-slate-900",
+          month_grid: "w-full flex-1 h-full flex flex-col min-h-0 overflow-hidden",
+          weekdays: "flex w-full flex-none h-6",
+          weekday: "text-slate-500 flex-1 font-normal text-[min(10px,_2.5vh)] uppercase flex items-center justify-center h-full",
+          weeks: "flex-1 flex flex-col min-h-0",
+          week: "flex w-full flex-1 min-h-0",
+          day: "relative p-0 flex-1 flex items-center justify-center min-h-0",
+          day_button: "relative max-h-full max-w-full aspect-square flex items-center justify-center rounded-full text-[min(14px,_3.5vh)] p-0 m-auto",
         }}
       />
     </div>
