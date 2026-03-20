@@ -15,8 +15,8 @@ describe('CalendarMonth', () => {
     );
 
     const buttons = container.querySelectorAll('button');
-    // 6 weeks * 7 days = 42 buttons
-    expect(buttons.length).toBe(42);
+    // August 2024 spans 5 weeks (31 days + offset) = 35 buttons
+    expect(buttons.length).toBe(35);
   });
 
   it('renders outside days with the outside class', () => {

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, type LucideIcon } from 'lucide-react';
+import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 
@@ -23,6 +23,11 @@ interface HeaderProps {
     // Edit Mode Props
     isEditMode: boolean;
     setIsEditMode: (edit: boolean) => void;
+
+    // Year Props
+    currentYear?: number;
+    onPrevYear?: () => void;
+    onNextYear?: () => void;
 }
 
 interface TypeToggleButtonProps {
@@ -63,7 +68,10 @@ export default function Header({
     setGoogleClientId,
     onLogout,
     isEditMode,
-    setIsEditMode
+    setIsEditMode,
+    currentYear,
+    onPrevYear,
+    onNextYear
 }: HeaderProps) {
     const navigate = useNavigate();
 
@@ -118,6 +126,29 @@ export default function Header({
                    </div>
                    
                    <div className="flex gap-2 items-center">
+                        {/* Compact Year Selector - Desktop only */}
+                        {currentYear !== undefined && onPrevYear && onNextYear && (
+                            <div className="hidden md:flex items-center bg-slate-50 rounded-full p-0.5 border border-slate-200 mr-2">
+                                <button 
+                                    onClick={onPrevYear}
+                                    className="p-1 hover:bg-white rounded-full transition-all text-slate-400 hover:text-slate-700 hover:shadow-sm"
+                                    aria-label="Previous Year"
+                                >
+                                    <ChevronLeft size={16} />
+                                </button>
+                                <span className="px-2 text-sm font-bold text-slate-600 tabular-nums min-w-[3.5rem] text-center">
+                                    {currentYear}
+                                </span>
+                                <button 
+                                    onClick={onNextYear}
+                                    className="p-1 hover:bg-white rounded-full transition-all text-slate-400 hover:text-slate-700 hover:shadow-sm"
+                                    aria-label="Next Year"
+                                >
+                                    <ChevronRight size={16} />
+                                </button>
+                            </div>
+                        )}
+
                         <button
                             onClick={() => setIsEditMode(!isEditMode)}
                             className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${

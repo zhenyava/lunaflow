@@ -125,6 +125,9 @@ function CalendarApp() {
         onLogout={handleLogout}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}
+        currentYear={currentYear}
+        onPrevYear={handlePrevYear}
+        onNextYear={handleNextYear}
       />
 
       {/* Main Content Area */}
