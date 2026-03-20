@@ -53,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const safe_expires_in = Math.max(0, expires_in - 30);
 
     // Redirect to the frontend with the access_token in the URL hash fragment
-    const frontendUrl = `${getBaseUrl(req)}/#access_token=${access_token}&expires_in=${safe_expires_in}`;
+    const frontendUrl = `${getBaseUrl(req)}/calendar/#access_token=${access_token}&expires_in=${safe_expires_in}`;
     res.redirect(frontendUrl);
   } catch (error) {
     console.error('Callback error:', error);
