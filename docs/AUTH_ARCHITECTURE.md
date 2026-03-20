@@ -2,25 +2,26 @@
 
 This document describes the persistent Google Drive authentication system implemented in LunaFlow.
 
-## Overview
-
-LunaFlow uses a **Backend-Driven OAuth 2.0 Authorization Code flow** with Vercel Serverless Functions. This architecture allows the app to maintain long-lived sessions using `refresh_tokens` without exposing sensitive credentials or tokens to the frontend.
-
 ## Core Components
 
 ### 1. Backend (Vercel Serverless Functions)
+
 Located in `/api/auth/`, these functions handle the "secure" part of OAuth.
+
 - **`/api/auth/login`**: Redirects the user to Google's OAuth consent screen with `access_type=offline` and `prompt=consent` to ensure a `refresh_token` is issued.
 - **`/api/auth/callback`**: Receives the authorization code, exchanges it for tokens, and encrypts the `refresh_token` into a secure cookie.
 - **`/api/auth/refresh`**: Decrypts the cookie and requests a new `access_token` from Google.
 - **`/api/auth/logout`**: Destroys the secure session.
 
 ### 2. Session Management (`iron-session`)
+
 We use `iron-session` to manage a stateless, encrypted, `HttpOnly` cookie named `lunaflow_auth_session`.
+
 - **Security**: The `refresh_token` is never sent to the frontend. It stays encrypted in the cookie, protected from XSS.
 - **Rolling Sessions**: The session is valid for 30 days. This timer is **reset** every time the user visits the app and a token refresh occurs (Scenario 2). This means the user only needs to re-authenticate if they are inactive for more than 30 consecutive days.
 
 ### 3. Frontend Service (`googleService.ts`)
+
 - **`ensureValidToken()`**: A proactive interceptor that checks the token TTL before every Google Drive API call.
 - **Proactive Refresh**: If the token is expired, it silently calls `/api/auth/refresh` to get a new one.
 
@@ -40,6 +41,7 @@ To prevent race conditions and network latency issues, we implement a **Backend-
 ## Authentication Flows (Scenario Analysis)
 
 ### Scenario 1: First Login
+
 1. User clicks "Sync".
 2. **Redirect**: `Frontend` -> `/api/auth/login` -> `Google Auth`.
 3. **Consent**: User clicks "Allow".
@@ -49,6 +51,7 @@ To prevent race conditions and network latency issues, we implement a **Backend-
 7. **Hydration**: Frontend parses the hash, saves the token to `localStorage`, and scrubs the URL.
 
 ### Scenario 2: Background Refresh (Silent)
+
 1. User interacts with the app (e.g., adds a record).
 2. `googleService` triggers a sync.
 3. `ensureValidToken()` detects `Date.now() >= expiresAt`.
@@ -57,6 +60,7 @@ To prevent race conditions and network latency issues, we implement a **Backend-
 6. **Resume**: Frontend updates `localStorage` and continues the original Drive API call.
 
 ### Scenario 3: Session Expiration (> 30 days)
+
 1. User returns after a long break.
 2. `ensureValidToken()` triggers a refresh.
 3. `/api/auth/refresh` returns `401 Unauthorized` because the cookie is missing or expired.
