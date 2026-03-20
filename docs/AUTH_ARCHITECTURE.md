@@ -1,7 +1,5 @@
 # LunaFlow Authentication Architecture
 
-This document describes the persistent Google Drive authentication system implemented in LunaFlow.
-
 ## Core Components
 
 ### 1. Backend (Vercel Serverless Functions)
