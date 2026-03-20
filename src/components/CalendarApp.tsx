@@ -144,9 +144,6 @@ function CalendarApp() {
           />
 
           <DesktopCalendarView 
-              currentYear={currentYear}
-              onPrevYear={handlePrevYear}
-              onNextYear={handleNextYear}
               months={desktopMonths}
               events={events} // UI uses cleaned events
               predictedDates={predictedDates}

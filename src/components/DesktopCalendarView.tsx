@@ -2,9 +2,6 @@ import type { DailyRecord } from '../types';
 import CalendarMonth from './CalendarMonth';
 
 interface DesktopCalendarViewProps {
-    currentYear: number;
-    onPrevYear: () => void;
-    onNextYear: () => void;
     months: Date[];
     events: DailyRecord[];
     predictedDates: Set<string>;
@@ -14,9 +11,6 @@ interface DesktopCalendarViewProps {
 }
 
 export default function DesktopCalendarView({
-    currentYear,
-    onPrevYear,
-    onNextYear,
     months,
     events,
     predictedDates,
