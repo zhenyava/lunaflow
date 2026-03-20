@@ -48,6 +48,8 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
         hideNavigation
         onDayClick={onDayClick}
         selected={selectedDate || undefined}
+        showOutsideDays
+        fixedWeeks
         modifiers={{
           period_light: periodLight,
           period_medium: periodMedium,
@@ -89,6 +91,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           week: "flex w-full h-[16.66%]",
           day: "w-[14.28%] h-full flex items-center justify-center p-0",
           day_button: "relative w-[85%] h-[85%] max-w-[3rem] max-h-[3rem] aspect-square flex items-center justify-center rounded-full text-xs sm:text-sm md:text-base p-0 m-auto",
+          outside: "opacity-40 [&_button]:text-slate-400",
         }}
       />
     </div>

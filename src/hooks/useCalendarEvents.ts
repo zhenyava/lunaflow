@@ -35,14 +35,12 @@ export function useCalendarEvents() {
                 delete newRecord.period;
             } else {
                 newRecord.period = {};
-                delete newRecord.ovulation;
             }
         } else if (activeType === 'ovulation') {
             if (newRecord.ovulation) {
                 delete newRecord.ovulation;
             } else {
                 newRecord.ovulation = {};
-                delete newRecord.period;
             }
         }
 
