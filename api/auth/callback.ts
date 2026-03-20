@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getIronSession } from 'iron-session';
 import { sessionOptions, SessionData } from '../utils/session.js';
+import { getBaseUrl, getRedirectUri } from '../utils/url.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { code } = req.query;
@@ -16,9 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const redirectUri = `${protocol}://${host}/api/auth/callback`;
+  const redirectUri = getRedirectUri(req);
 
   try {
     // Exchange code for tokens
@@ -54,7 +53,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const safe_expires_in = Math.max(0, expires_in - 30);
 
     // Redirect to the frontend with the access_token in the URL hash fragment
-    const frontendUrl = `${protocol}://${host}/#access_token=${access_token}&expires_in=${safe_expires_in}`;
+    const frontendUrl = `${getBaseUrl(req)}/#access_token=${access_token}&expires_in=${safe_expires_in}`;
     res.redirect(frontendUrl);
   } catch (error) {
     console.error('Callback error:', error);

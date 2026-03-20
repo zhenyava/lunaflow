@@ -1,4 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { getRedirectUri } from '../utils/url.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
@@ -6,10 +7,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing Google Client ID' });
   }
 
-  // Determine the protocol based on the environment (local dev vs production)
-  const protocol = req.headers['x-forwarded-proto'] || 'http';
-  const host = req.headers['x-forwarded-host'] || req.headers.host;
-  const redirectUri = `${protocol}://${host}/api/auth/callback`;
+  const redirectUri = getRedirectUri(req);
 
   // Required scopes for Google Drive
   const scopes = [
