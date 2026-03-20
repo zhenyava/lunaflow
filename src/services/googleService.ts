@@ -18,6 +18,9 @@ interface GapiClient {
         create: (params: Record<string, unknown>) => Promise<GapiFileResult<{ id: string }>>;
         get: (params: Record<string, unknown>) => Promise<GapiFileResult<unknown>>;
       };
+      permissions: {
+        create: (params: Record<string, unknown>) => Promise<GapiFileResult<unknown>>;
+      };
     };
   };
 }
@@ -261,6 +264,43 @@ export const fetchDriveDataContent = async (fileId: string): Promise<unknown> =>
         throw error;
     }
 }
+
+export const shareDriveFile = async (fileId: string, email: string, role: 'reader' | 'writer'): Promise<void> => {
+    await ensureValidToken();
+    try {
+        await window.gapi.client.drive.permissions.create({
+            fileId: fileId,
+            sendNotificationEmail: true,
+            resource: {
+                type: 'user',
+                role: role,
+                emailAddress: email
+            }
+        });
+    } catch (error) {
+        console.error("Share Drive File Error", error);
+        throw error;
+    }
+};
+
+export const getSharedDriveFile = async (fileId: string): Promise<{ id: string; canEdit: boolean }> => {
+    await ensureValidToken();
+    try {
+        const response = await window.gapi.client.drive.files.get({
+            fileId: fileId,
+            fields: 'id, capabilities'
+        });
+        
+        const file = response.result as { id: string; capabilities?: { canEdit?: boolean } };
+        return {
+            id: file.id,
+            canEdit: !!file.capabilities?.canEdit
+        };
+    } catch (error) {
+        console.error("Get Shared Drive File Error", error);
+        throw error;
+    }
+};
 
 export const revokeToken = async () => {
     try {

@@ -7,7 +7,8 @@ import {
   uploadDriveData, 
   fetchDriveDataContent,
   revokeToken,
-  restoreGapiSession
+  restoreGapiSession,
+  getSharedDriveFile
 } from '../services/googleService';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
 import { GOOGLE_CLIENT_ID, GOOGLE_SCOPES } from '../constants';
@@ -34,6 +35,8 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
+  const [isSharedFileReadOnly, setIsSharedFileReadOnly] = useState(false);
+  const [isSharedFile, setIsSharedFile] = useState(false);
   
   // Use Client ID from constants or fallback to local storage
   const [googleClientId, setGoogleClientId] = useState(() => {
@@ -81,10 +84,12 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
       setIsAuthenticated(false);
       setDriveFileId(null);
       setSyncState({ status: 'idle' });
+      setIsSharedFileReadOnly(false);
+      setIsSharedFile(false);
   }, []);
 
   // CORE SYNCHRONIZATION LOGIC
-  const performFullSync = useCallback(async (fileId: string) => {
+  const performFullSync = useCallback(async (fileId: string, isReadOnly: boolean = false) => {
     if (!fileId) return;
     setSyncState({ status: 'syncing' });
     try {
@@ -100,7 +105,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
         }
 
         const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
-        if (isRemoteDifferent) {
+        if (isRemoteDifferent && !isReadOnly) {
              await uploadDriveData(fileId, merged);
         }
 
@@ -125,19 +130,42 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
             const token: GoogleToken = JSON.parse(storedTokenStr);
             
             // If we have a token, restore session immediately
-            // The ensureValidToken logic will handle refresh if it's expired during ensureDriveFileExists
             restoreGapiSession(token);
-            setTimeout(() => {
+            setTimeout(async () => {
                 setIsAuthenticated(true);
-                ensureDriveFileExists()
-                    .then(id => {
-                        setDriveFileId(id);
-                        performFullSync(id); 
-                    })
-                    .catch((err) => {
-                        console.error('Session restore failed', err);
-                        handleLogout();
-                    });
+                
+                try {
+                    const sharedId = localStorage.getItem('LUNA_SHARED_FILE_ID');
+                    let targetFileId = null;
+                    let isReadOnly = false;
+                    
+                    if (sharedId) {
+                        try {
+                            const sharedFile = await getSharedDriveFile(sharedId);
+                            targetFileId = sharedFile.id;
+                            isReadOnly = !sharedFile.canEdit;
+                            setIsSharedFileReadOnly(isReadOnly);
+                            setIsSharedFile(true);
+                        } catch (err) {
+                            console.warn("Could not access shared file, falling back to personal", err);
+                            localStorage.removeItem('LUNA_SHARED_FILE_ID');
+                            setIsSharedFile(false);
+                        }
+                    }
+                    
+                    if (!targetFileId) {
+                        targetFileId = await ensureDriveFileExists();
+                        setIsSharedFileReadOnly(false);
+                        setIsSharedFile(false);
+                        isReadOnly = false;
+                    }
+                    
+                    setDriveFileId(targetFileId);
+                    performFullSync(targetFileId, isReadOnly); 
+                } catch(err) {
+                    console.error('Session restore logic failed', err);
+                    handleLogout();
+                }
             }, 0);
         }
     } catch {
@@ -161,20 +189,64 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     }
   };
 
+  const connectSharedFile = async (linkOrId: string) => {
+      // Extract ID from full link or just use the ID
+      const match = linkOrId.match(/[-\w]{25,}/);
+      const extractedId = match ? match[0] : linkOrId.trim();
+      
+      if (!extractedId) {
+          alert("Invalid link or File ID.");
+          return;
+      }
+      
+      localStorage.setItem('LUNA_SHARED_FILE_ID', extractedId);
+      
+      if (!isAuthenticated) {
+          await handleGoogleLogin();
+          return; // will redirect
+      }
+      
+      // If already authenticated, switch context immediately
+      try {
+          setSyncState({ status: 'syncing' });
+          const sharedFile = await getSharedDriveFile(extractedId);
+          setDriveFileId(sharedFile.id);
+          setIsSharedFileReadOnly(!sharedFile.canEdit);
+          setIsSharedFile(true);
+          performFullSync(sharedFile.id, !sharedFile.canEdit);
+          alert("Successfully connected to shared file!");
+      } catch (err) {
+          console.error("Failed to connect to shared file", err);
+          alert("Could not access the shared file. Ensure you have permission.");
+          setSyncState({ status: 'error' });
+          localStorage.removeItem('LUNA_SHARED_FILE_ID');
+          setIsSharedFile(false);
+      }
+  };
+
+  const disconnectSharedFile = () => {
+      localStorage.removeItem('LUNA_SHARED_FILE_ID');
+      setIsSharedFile(false);
+      setIsSharedFileReadOnly(false);
+      setDriveFileId(null);
+      // Trigger a reload to re-initialize with the personal file
+      window.location.reload();
+  };
+
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
           if (isAuthenticated && driveFileId && syncState.status !== 'syncing') {
-              performFullSync(driveFileId);
+              performFullSync(driveFileId, isSharedFileReadOnly);
           }
       };
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, driveFileId, syncState.status, performFullSync]);
+  }, [isAuthenticated, driveFileId, syncState.status, performFullSync, isSharedFileReadOnly]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !driveFileId) return;
+    if (!isAuthenticated || !driveFileId || isSharedFileReadOnly) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
@@ -193,7 +265,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     }, 2000); 
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced]);
+  }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced, isSharedFileReadOnly]);
 
   return {
     isAuthenticated,
@@ -203,6 +275,10 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     setGoogleClientId,
     handleGoogleLogin,
     handleLogout,
-    performFullSync
+    performFullSync,
+    connectSharedFile,
+    disconnectSharedFile,
+    isSharedFile,
+    isSharedFileReadOnly
   };
 }

@@ -12,6 +12,8 @@ vi.mock('../services/googleService', () => ({
   revokeToken: vi.fn(() => Promise.resolve()),
   restoreGapiSession: vi.fn(),
   ensureValidToken: vi.fn(() => Promise.resolve()),
+  getSharedDriveFile: vi.fn(() => Promise.resolve({ id: 'shared-id', canEdit: true })),
+  shareDriveFile: vi.fn(() => Promise.resolve()),
 }));
 
 describe('useGoogleSync integration', () => {

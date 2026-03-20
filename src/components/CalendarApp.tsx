@@ -49,7 +49,11 @@ function CalendarApp() {
     handleGoogleLogin,
     handleLogout,
     performFullSync,
-    driveFileId
+    driveFileId,
+    connectSharedFile,
+    disconnectSharedFile,
+    isSharedFile,
+    isSharedFileReadOnly
   } = useGoogleSync({ 
       events: allRecords, // Pass raw records for sync
       setEvents
@@ -128,6 +132,11 @@ function CalendarApp() {
         currentYear={currentYear}
         onPrevYear={handlePrevYear}
         onNextYear={handleNextYear}
+        driveFileId={driveFileId}
+        connectSharedFile={connectSharedFile}
+        disconnectSharedFile={disconnectSharedFile}
+        isSharedFile={isSharedFile}
+        isSharedFileReadOnly={isSharedFileReadOnly}
       />
 
       {/* Main Content Area */}

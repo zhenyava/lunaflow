@@ -28,6 +28,13 @@ interface HeaderProps {
     currentYear?: number;
     onPrevYear?: () => void;
     onNextYear?: () => void;
+
+    // Sharing Props
+    driveFileId: string | null;
+    connectSharedFile: (linkOrId: string) => void;
+    disconnectSharedFile: () => void;
+    isSharedFile: boolean;
+    isSharedFileReadOnly: boolean;
 }
 
 interface TypeToggleButtonProps {
@@ -71,7 +78,12 @@ export default function Header({
     setIsEditMode,
     currentYear,
     onPrevYear,
-    onNextYear
+    onNextYear,
+    driveFileId,
+    connectSharedFile,
+    disconnectSharedFile,
+    isSharedFile,
+    isSharedFileReadOnly
 }: HeaderProps) {
     const navigate = useNavigate();
 
@@ -197,6 +209,11 @@ export default function Header({
                 setGoogleClientId={setGoogleClientId}
                 onLogin={onLogin}
                 onLogout={onLogout}
+                driveFileId={driveFileId}
+                connectSharedFile={connectSharedFile}
+                disconnectSharedFile={disconnectSharedFile}
+                isSharedFile={isSharedFile}
+                isSharedFileReadOnly={isSharedFileReadOnly}
             />
         </header>
     );
