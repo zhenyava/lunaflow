@@ -3,8 +3,7 @@
     {
       "id": "mood",
       "name": "Mood",
-      "unselectedClass": "bg-rose-50 text-rose-600 border-rose-100 hover:border-rose-200",
-      "selectedClass": "bg-white text-rose-700 border-rose-600",
+      "color": "rose",
       "options": [
         { "id": "happy", "label": "Happy" },
         { "id": "calm", "label": "Calm" },
@@ -19,8 +18,7 @@
     {
       "id": "physical",
       "name": "Physical",
-      "unselectedClass": "bg-amber-50 text-amber-600 border-amber-100 hover:border-amber-200",
-      "selectedClass": "bg-white text-amber-700 border-amber-600",
+      "color": "amber",
       "options": [
         { "id": "cramps", "label": "Cramps" },
         { "id": "tender_breasts", "label": "Tender Breasts" },
@@ -35,8 +33,7 @@
     {
       "id": "digestive",
       "name": "Digestive",
-      "unselectedClass": "bg-emerald-50 text-emerald-600 border-emerald-100 hover:border-emerald-200",
-      "selectedClass": "bg-white text-emerald-700 border-emerald-600",
+      "color": "emerald",
       "options": [
         { "id": "constipation", "label": "Constipation" },
         { "id": "diarrhea", "label": "Diarrhea" },
@@ -47,8 +44,7 @@
     {
       "id": "skin",
       "name": "Skin",
-      "unselectedClass": "bg-sky-50 text-sky-600 border-sky-100 hover:border-sky-200",
-      "selectedClass": "bg-white text-sky-700 border-sky-600",
+      "color": "sky",
       "options": [
         { "id": "oily", "label": "Oily" },
         { "id": "dry", "label": "Dry" },

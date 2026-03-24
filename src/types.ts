@@ -10,8 +10,7 @@ export interface SymptomOption {
 export interface SymptomCategory {
   id: string;
   name: string;
-  unselectedClass: string;
-  selectedClass: string;
+  color: string;
   options: SymptomOption[];
 }
 
