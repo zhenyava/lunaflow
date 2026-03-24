@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
-import { X, Droplet, Sparkles } from 'lucide-react';
+import { X, Droplet, Sparkles, Trash2 } from 'lucide-react';
 import type { DailyRecord, FlowIntensity } from '../types';
+import symptomsData from '../data/symptoms.json';
 
 interface DayDetailsPanelProps {
   date: Date;
@@ -21,6 +22,7 @@ export default function DayDetailsPanel({ date, record, onClose, onUpdate }: Day
   const isPeriod = !!record?.period;
   const isOvulation = !!record?.ovulation;
   const currentIntensity = record?.period?.intensity || 'medium';
+  const currentSymptoms = record?.symptoms || {};
 
   const handleTogglePeriod = () => {
     if (isPeriod) {
@@ -42,8 +44,32 @@ export default function DayDetailsPanel({ date, record, onClose, onUpdate }: Day
     onUpdate(dateStr, { period: { ...record?.period, intensity } });
   };
 
+  const handleToggleSymptom = (categoryId: string, optionId: string) => {
+    const updatedSymptoms = { ...currentSymptoms };
+    const categorySymptoms = [...(updatedSymptoms[categoryId] || [])];
+    
+    if (categorySymptoms.includes(optionId)) {
+      updatedSymptoms[categoryId] = categorySymptoms.filter(id => id !== optionId);
+      if (updatedSymptoms[categoryId].length === 0) {
+        delete updatedSymptoms[categoryId];
+      }
+    } else {
+      updatedSymptoms[categoryId] = [...categorySymptoms, optionId];
+    }
+
+    onUpdate(dateStr, { symptoms: updatedSymptoms });
+  };
+
+  const handleClearSymptoms = () => {
+    onUpdate(dateStr, { symptoms: undefined });
+  };
+
+  const hasAnySymptoms = Object.keys(currentSymptoms).some(
+    (key) => currentSymptoms[key].length > 0
+  );
+
   return (
-    <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:relative md:rounded-none md:shadow-none md:border-l md:border-slate-200 md:w-80 md:h-full flex flex-col">
+    <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:relative md:rounded-none md:shadow-none md:border-l md:border-slate-200 md:w-80 md:h-full flex flex-col max-h-[85vh] md:max-h-none">
       <div className="flex items-center justify-between p-4 border-b border-slate-100">
         <h2 className="text-lg font-semibold text-slate-800">
           {format(date, 'MMMM d, yyyy')}
@@ -112,7 +138,40 @@ export default function DayDetailsPanel({ date, record, onClose, onUpdate }: Day
           </div>
         )}
 
-        {/* Future: Symptoms, Notes, etc. */}
+        {/* Symptoms Sections */}
+        {symptomsData.categories.map((category) => (
+          <div key={category.id} className="space-y-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{category.name}</h3>
+            <div className="flex flex-wrap gap-2">
+              {category.options.map((option) => {
+                const isSelected = currentSymptoms[category.id]?.includes(option.id);
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => handleToggleSymptom(category.id, option.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                      isSelected
+                        ? 'border-slate-800 bg-slate-800 text-white'
+                        : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {hasAnySymptoms && (
+          <button
+            onClick={handleClearSymptoms}
+            className="flex items-center justify-center gap-2 w-full py-3 text-sm font-medium text-slate-400 hover:text-rose-500 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear all symptoms
+          </button>
+        )}
       </div>
     </div>
   );

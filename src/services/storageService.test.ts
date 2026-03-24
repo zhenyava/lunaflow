@@ -75,7 +75,7 @@ describe('storageService', () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const mockError = new Error('Access to localStorage denied');
-      const getItemSpy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      const getItemSpy = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
         throw mockError;
       });
 

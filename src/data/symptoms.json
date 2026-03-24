@@ -1,0 +1,52 @@
+{
+  "categories": [
+    {
+      "id": "mood",
+      "name": "Mood",
+      "options": [
+        { "id": "happy", "label": "Happy" },
+        { "id": "calm", "label": "Calm" },
+        { "id": "anxious", "label": "Anxious" },
+        { "id": "irritable", "label": "Irritable" },
+        { "id": "sad", "label": "Sad" },
+        { "id": "tearful", "label": "Tearful" },
+        { "id": "lethargic", "label": "Lethargic" },
+        { "id": "unfocused", "label": "Unfocused" }
+      ]
+    },
+    {
+      "id": "physical",
+      "name": "Physical",
+      "options": [
+        { "id": "cramps", "label": "Cramps" },
+        { "id": "tender_breasts", "label": "Tender Breasts" },
+        { "id": "headache", "label": "Headache" },
+        { "id": "backache", "label": "Backache" },
+        { "id": "fatigue", "label": "Fatigue" },
+        { "id": "bloating", "label": "Bloating" },
+        { "id": "acne", "label": "Acne" },
+        { "id": "nausea", "label": "Nausea" }
+      ]
+    },
+    {
+      "id": "digestive",
+      "name": "Digestive",
+      "options": [
+        { "id": "constipation", "label": "Constipation" },
+        { "id": "diarrhea", "label": "Diarrhea" },
+        { "id": "increased_appetite", "label": "Increased Appetite" },
+        { "id": "decreased_appetite", "label": "Decreased Appetite" }
+      ]
+    },
+    {
+      "id": "skin",
+      "name": "Skin",
+      "options": [
+        { "id": "oily", "label": "Oily" },
+        { "id": "dry", "label": "Dry" },
+        { "id": "sensitive", "label": "Sensitive" },
+        { "id": "clear", "label": "Clear" }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,17 @@ export type EventType = 'period' | 'ovulation';
 
 export type FlowIntensity = 'light' | 'medium' | 'heavy' | 'spotting';
 
+export interface SymptomOption {
+  id: string;
+  label: string;
+}
+
+export interface SymptomCategory {
+  id: string;
+  name: string;
+  options: SymptomOption[];
+}
+
 /**
  * Core data entity representing a single day in the calendar.
  * Replaces the old Event-based model to support multi-device sync and tombstones.
@@ -24,6 +35,11 @@ export interface DailyRecord {
    * If the property exists, it indicates that ovulation was recorded.
    */
   ovulation?: Record<string, never>;
+
+  /**
+   * Optional map of categoryId to array of optionIds (symptoms).
+   */
+  symptoms?: Record<string, string[]>;
 
   /** 
    * Unix timestamp (milliseconds) of the last time this record was modified.

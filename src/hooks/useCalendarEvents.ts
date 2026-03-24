@@ -46,9 +46,10 @@ export function useCalendarEvents() {
 
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
+        const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
         
         // If no data left for this day, mark as deleted
-        if (!hasPeriod && !hasOvulation) {
+        if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
         } else {
             newRecord.isDeleted = false;
@@ -86,9 +87,9 @@ export function useCalendarEvents() {
         // Check if there's any data left
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
-        // In the future, check for symptoms here too
+        const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
         
-        if (!hasPeriod && !hasOvulation) {
+        if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
         } else {
             newRecord.isDeleted = false;
@@ -108,8 +109,9 @@ export function useCalendarEvents() {
         
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
+        const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
         
-        if (!hasPeriod && !hasOvulation) {
+        if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
         }
 
