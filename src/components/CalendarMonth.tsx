@@ -26,7 +26,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
   // Memoize dates calculation to prevent unnecessary work on every render
   const { 
     periodLight, periodMedium, periodHeavy, periodSpotting, 
-    ovulationDates, predicted, predictedOvulation
+    ovulationDates, symptomDates, predicted, predictedOvulation
   } = React.useMemo(() => {
     return {
       periodLight: events.filter(e => e.period?.intensity === 'light').map(e => parseISO(e.date)),
@@ -34,6 +34,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
       periodHeavy: events.filter(e => e.period?.intensity === 'heavy').map(e => parseISO(e.date)),
       periodSpotting: events.filter(e => e.period?.intensity === 'spotting').map(e => parseISO(e.date)),
       ovulationDates: events.filter(e => !!e.ovulation).map(e => parseISO(e.date)),
+      symptomDates: events.filter(e => e.symptoms && Object.keys(e.symptoms).some(k => e.symptoms![k].length > 0)).map(e => parseISO(e.date)),
       predicted: Array.from(predictedDates || []).map(d => parseISO(d)),
       predictedOvulation: Array.from(predictedOvulationDates || []).map(d => parseISO(d))
     };
@@ -55,6 +56,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           period_heavy: periodHeavy,
           period_spotting: periodSpotting,
           ovulation: ovulationDates,
+          has_symptoms: symptomDates,
           predicted: predicted,
           predictedOvulation: predictedOvulation
         }}
@@ -66,6 +68,7 @@ const CalendarMonth: React.FC<CalendarMonthProps> = ({
           period_heavy: "[&_button]:bg-rose-700 [&_button]:text-white",
           period_spotting: "[&_button]:bg-rose-100 [&_button]:text-rose-700",
           ovulation: "[&_button]:bg-violet-500 [&_button]:text-white",
+          has_symptoms: "[&_button]:after:content-[''] [&_button]:after:absolute [&_button]:after:bottom-1 [&_button]:after:w-1 [&_button]:after:h-1 [&_button]:after:rounded-full [&_button]:after:bg-slate-400",
           predicted: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-rose-300 [&_button]:text-rose-500 [&_button]:bg-rose-50",
           predictedOvulation: "[&_button]:border-2 [&_button]:border-dashed [&_button]:border-violet-300 [&_button]:text-violet-500 [&_button]:bg-violet-50"
         }}
