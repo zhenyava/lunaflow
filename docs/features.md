@@ -20,6 +20,11 @@ This document serves as the Product Requirements Document (PRD) for LunaFlow. It
 - **Averages Calculation:** The app calculates the user's average cycle length and average period duration based on historical logs. Outliers (e.g., unusually long gaps) should be ignored in the average calculation.
 - **Future Projections:** Based on the calculated averages, the app predicts and highlights future expected periods and ovulation windows on the calendar.
 
-## 5. Responsive Views
+## 5. Symptoms Logging
+- **Categorized Logging:** Users can log daily symptoms across multiple categories (e.g., Mood, Physical, Digestive).
+- **Data-Driven Configuration:** Symptoms and categories are defined in a JSON configuration, allowing for future personalization.
+- **Visual Indicators:** Days with logged symptoms are marked with a subtle dot indicator on the calendar view.
+
+## 6. Responsive Views
 - **Desktop View:** On larger screens, the calendar should display in a comprehensive year-view (e.g., a grid of months) that fits within the viewport.
 - **Mobile View:** On small screens, the UI must adapt to a mobile-native feel featuring a single-column, infinite vertical scroll, relying on bottom sheets and floating action buttons for interactions.

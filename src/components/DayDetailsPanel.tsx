@@ -68,6 +68,29 @@ export default function DayDetailsPanel({ date, record, onClose, onUpdate }: Day
     (key) => currentSymptoms[key].length > 0
   );
 
+  const CATEGORY_COLORS: Record<string, { unselected: string; selected: string }> = {
+    rose: {
+      unselected: 'bg-rose-50 text-rose-600 border-rose-100 hover:border-rose-200',
+      selected: 'bg-white text-rose-700 border-rose-600'
+    },
+    amber: {
+      unselected: 'bg-amber-50 text-amber-600 border-amber-100 hover:border-amber-200',
+      selected: 'bg-white text-amber-700 border-amber-600'
+    },
+    emerald: {
+      unselected: 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:border-emerald-200',
+      selected: 'bg-white text-emerald-700 border-emerald-600'
+    },
+    sky: {
+      unselected: 'bg-sky-50 text-sky-600 border-sky-100 hover:border-sky-200',
+      selected: 'bg-white text-sky-700 border-sky-600'
+    },
+    slate: {
+      unselected: 'bg-slate-50 text-slate-600 border-slate-100 hover:border-slate-200',
+      selected: 'bg-white text-slate-700 border-slate-600'
+    }
+  };
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] md:relative md:rounded-none md:shadow-none md:border-l md:border-slate-200 md:w-80 md:h-full flex flex-col max-h-[85vh] md:max-h-none">
       <div className="flex items-center justify-between p-4 border-b border-slate-100">
@@ -139,29 +162,30 @@ export default function DayDetailsPanel({ date, record, onClose, onUpdate }: Day
         )}
 
         {/* Symptoms Sections */}
-        {symptomsData.categories.map((category) => (
-          <div key={category.id} className="space-y-3">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{category.name}</h3>
-            <div className="flex flex-wrap gap-2">
-              {category.options.map((option) => {
-                const isSelected = currentSymptoms[category.id]?.includes(option.id);
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => handleToggleSymptom(category.id, option.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
-                      isSelected
-                        ? 'border-slate-800 bg-slate-800 text-white'
-                        : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
+        {symptomsData.categories.map((category) => {
+          const colors = (CATEGORY_COLORS as any)[category.color] || CATEGORY_COLORS.slate;
+          return (
+            <div key={category.id} className="space-y-3">
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{category.name}</h3>
+              <div className="flex flex-wrap gap-2">
+                {category.options.map((option) => {
+                  const isSelected = currentSymptoms[category.id]?.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => handleToggleSymptom(category.id, option.id)}
+                      className={`px-3 py-1.5 rounded-full text-sm font-medium border-2 transition-all ${
+                        isSelected ? colors.selected : colors.unselected
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         {hasAnySymptoms && (
           <button

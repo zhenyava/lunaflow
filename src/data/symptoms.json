@@ -3,6 +3,7 @@
     {
       "id": "mood",
       "name": "Mood",
+      "color": "rose",
       "options": [
         { "id": "happy", "label": "Happy" },
         { "id": "calm", "label": "Calm" },
@@ -17,6 +18,7 @@
     {
       "id": "physical",
       "name": "Physical",
+      "color": "amber",
       "options": [
         { "id": "cramps", "label": "Cramps" },
         { "id": "tender_breasts", "label": "Tender Breasts" },
@@ -31,6 +33,7 @@
     {
       "id": "digestive",
       "name": "Digestive",
+      "color": "emerald",
       "options": [
         { "id": "constipation", "label": "Constipation" },
         { "id": "diarrhea", "label": "Diarrhea" },
@@ -41,6 +44,7 @@
     {
       "id": "skin",
       "name": "Skin",
+      "color": "sky",
       "options": [
         { "id": "oily", "label": "Oily" },
         { "id": "dry", "label": "Dry" },
