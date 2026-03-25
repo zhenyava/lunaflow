@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GoogleDriveProvider } from './GoogleDriveProvider';
 import * as googleService from '../services/googleService';
+import type { DailyRecord } from '../types';
 
 vi.mock('../services/googleService', () => ({
   initializeGoogleApi: vi.fn(),
@@ -57,7 +58,7 @@ describe('GoogleDriveProvider', () => {
   });
 
   it('should upload data to drive', async () => {
-    const events: any[] = [];
+    const events: DailyRecord[] = [];
     await provider.uploadData('file-id', events);
     expect(googleService.uploadDriveData).toHaveBeenCalledWith('file-id', events);
   });
