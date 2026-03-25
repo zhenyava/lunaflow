@@ -160,8 +160,9 @@ export default function Header({
                             <span>{isEditMode ? 'Done Editing' : 'Edit Dates'}</span>
                         </button>
                         <button
-                            onClick={() => isAuthenticated ? onSync() : onLogin(availableProviders[0]?.id ?? 'google-drive')}
-                            className={`p-2 rounded-full transition-colors ${isAuthenticated ? 'hover:bg-green-50' : 'hover:bg-gray-100'}`}
+                            onClick={() => isAuthenticated ? onSync() : availableProviders[0] && onLogin(availableProviders[0].id)}
+                            disabled={!isAuthenticated && availableProviders.length === 0}
+                            className={`p-2 rounded-full transition-colors ${isAuthenticated ? 'hover:bg-green-50' : 'hover:bg-gray-100'} disabled:opacity-40 disabled:cursor-not-allowed`}
                             title={isAuthenticated ? "Click to Force Sync" : "Connect Cloud Storage"}
                         >
                             {getSyncIcon()}
