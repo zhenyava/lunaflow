@@ -1,7 +1,9 @@
 import type { DailyRecord, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, FOLDER_NAME, GOOGLE_SCOPES } from '../constants';
+import { APP_DATA_FILENAME, FOLDER_NAME } from '../constants';
 import { prepareDataForStorage } from '../services/storageService';
 import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
+
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 interface GapiFileResult<T = unknown> {
   result: T;
