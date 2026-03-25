@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { FOLDER_NAME } from '../constants';
 import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
 
 interface SettingsModalProps {
@@ -61,10 +60,6 @@ export default function SettingsModal({
                          ))}
                      </select>
                  </div>
-
-                 {selectedProviderId === 'google-drive' && (
-                     <p className="text-xs text-gray-500 mb-3">Sync your data to a folder named "{FOLDER_NAME}" in your Google Drive.</p>
-                 )}
                  
                  {!isAuthenticated ? (
                      <div className="space-y-2">
