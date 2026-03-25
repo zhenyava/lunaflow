@@ -6,10 +6,11 @@ This document serves as the Product Requirements Document (PRD) for LunaFlow. It
 - **Local-First Default:** All user data (cycle logs, settings) must be stored locally on the device (via `localStorage`) by default.
 - **Zero Tracking:** The application must not use external databases, analytics trackers, or third-party cookies that compromise user privacy.
 
-## 2. Google Drive Synchronization (Optional)
-- **Opt-in Backup:** Users can optionally link their Google Drive to sync and backup their data.
-- **App-Specific Folder:** The sync must only request permissions for and access an app-specific `LunaFlow` folder. It must not have access to the user's general Google Drive files.
-- **Seamless Merge:** Data from multiple devices synced to the same Google account should be merged intelligently without data loss.
+## 2. Remote Storage Synchronization (Optional)
+- **Opt-in Backup:** Users can optionally link their preferred remote storage provider (e.g., Google Drive) to sync and backup their data.
+- **Provider Agnostic:** The application supports multiple storage vendors via an abstraction layer. While Google Drive is the first implementation, the architecture allows for future support of other services like Dropbox or OneDrive.
+- **App-Specific Context:** Sync only requests permissions for and access an app-specific folder (e.g., `LunaFlow` folder on Google Drive). It must not have access to the user's general files.
+- **Seamless Merge:** Data from multiple devices synced to the same account should be merged intelligently without data loss.
 
 ## 3. Cycle & Ovulation Tracking
 - **Period Logging:** Users can select any day on the calendar and toggle it as a "Period" day.

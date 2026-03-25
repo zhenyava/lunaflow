@@ -1,16 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DailyRecord, GoogleToken, SyncState } from '../types';
-import { 
-  initializeGoogleApi, 
-  signInToGoogle, 
-  ensureDriveFileExists, 
-  uploadDriveData, 
-  fetchDriveDataContent,
-  revokeToken,
-  restoreGapiSession
-} from '../services/googleService';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
 import { GOOGLE_CLIENT_ID, GOOGLE_SCOPES } from '../constants';
+import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
+import { googleDriveProvider } from '../storageProviders/GoogleDriveProvider';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
@@ -24,14 +17,15 @@ export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   return stringA === stringB;
 }
 
-interface UseGoogleSyncProps {
+interface UseRemoteSyncProps {
   events: DailyRecord[];
   setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
+  provider?: RemoteStorageProvider;
 }
 
-export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
+export function useRemoteSync({ events, setEvents, provider = googleDriveProvider }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [driveFileId, setDriveFileId] = useState<string | null>(null);
+  const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
   
@@ -40,7 +34,8 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
      return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
   });
 
-  // Extract hash token on mount (from Scenario 1 redirect)
+  // Extract hash token on mount (specific to current Google flow)
+  // Note: This might need to move into provider if other providers use different redirect flows
   useEffect(() => {
     if (window.location.hash.includes('access_token=')) {
       const params = new URLSearchParams(window.location.hash.substring(1));
@@ -67,28 +62,28 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     }
   }, []);
 
-  // Init Google API
+  // Init Storage Provider API
   useEffect(() => {
-    initializeGoogleApi((success) => {
+    provider.initialize((success) => {
       if (success) {
          setIsApiInitialized(true);
       }
     });
-  }, []);
+  }, [provider]);
 
   const handleLogout = useCallback(async () => {
-      await revokeToken();
+      await provider.signOut();
       setIsAuthenticated(false);
-      setDriveFileId(null);
+      setRemoteFileId(null);
       setSyncState({ status: 'idle' });
-  }, []);
+  }, [provider]);
 
   // CORE SYNCHRONIZATION LOGIC
   const performFullSync = useCallback(async (fileId: string) => {
     if (!fileId) return;
     setSyncState({ status: 'syncing' });
     try {
-        const rawRemoteData = await fetchDriveDataContent(fileId);
+        const rawRemoteData = await provider.fetchData(fileId);
         const { records: remoteEvents } = parseAndMigrateData(rawRemoteData);
         const localEvents = events; 
         const merged = mergeEvents(localEvents, remoteEvents);
@@ -101,7 +96,7 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
 
         const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
         if (isRemoteDifferent) {
-             await uploadDriveData(fileId, merged);
+             await provider.uploadData(fileId, merged);
         }
 
         setSyncState({ status: 'success', lastSynced: new Date() });
@@ -113,47 +108,39 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
             setSyncState({ status: 'error' });
         }
     }
-  }, [events, setEvents, handleLogout]);
+  }, [events, setEvents, handleLogout, provider]);
 
-  // Token-based Session Restore
+  // Session Restore
   useEffect(() => {
     if (!isApiInitialized || isAuthenticated) return;
 
-    try {
-        const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
-        if (storedTokenStr) {
-            const token: GoogleToken = JSON.parse(storedTokenStr);
-            
-            // If we have a token, restore session immediately
-            // The ensureValidToken logic will handle refresh if it's expired during ensureDriveFileExists
-            restoreGapiSession(token);
-            setTimeout(() => {
-                setIsAuthenticated(true);
-                ensureDriveFileExists()
-                    .then(id => {
-                        setDriveFileId(id);
+    if (provider.isAuthenticated()) {
+        setTimeout(() => {
+            setIsAuthenticated(true);
+            provider.restoreSession()
+                .then(id => {
+                    if (id) {
+                        setRemoteFileId(id);
                         performFullSync(id); 
-                    })
-                    .catch((err) => {
-                        console.error('Session restore failed', err);
+                    } else {
                         handleLogout();
-                    });
-            }, 0);
-        }
-    } catch {
-        localStorage.removeItem('LUNA_AUTH_TOKEN');
+                    }
+                })
+                .catch((err) => {
+                    console.error('Session restore failed', err);
+                    handleLogout();
+                });
+        }, 0);
     }
-  }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync]);
+  }, [isApiInitialized, isAuthenticated, handleLogout, performFullSync, provider]);
 
-  const handleGoogleLogin = async () => {
+  const handleLogin = async () => {
     try {
       setSyncState({ status: 'syncing' });
-      // This will redirect the page, so code after this won't execute normally.
-      await signInToGoogle();
+      await provider.signIn();
     } catch (error: unknown) {
       setSyncState({ status: 'error' });
       setIsAuthenticated(false);
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
       let errorMessage = "Login failed.";
       const err = error as { message?: string };
       if (err?.message) errorMessage = err.message;
@@ -164,23 +151,23 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
-          if (isAuthenticated && driveFileId && syncState.status !== 'syncing') {
-              performFullSync(driveFileId);
+          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing') {
+              performFullSync(remoteFileId);
           }
       };
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, driveFileId, syncState.status, performFullSync]);
+  }, [isAuthenticated, remoteFileId, syncState.status, performFullSync]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !driveFileId) return;
+    if (!isAuthenticated || !remoteFileId) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
         setSyncState({ status: 'syncing' });
         try {
-            await uploadDriveData(driveFileId, events);
+            await provider.uploadData(remoteFileId, events);
             setSyncState({ status: 'success', lastSynced: new Date() });
         } catch (error: unknown) {
              const err = error as { message?: string; status?: number };
@@ -193,16 +180,17 @@ export function useGoogleSync({ events, setEvents }: UseGoogleSyncProps) {
     }, 2000); 
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, driveFileId, handleLogout, syncState.status, syncState.lastSynced]);
+  }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider]);
 
   return {
     isAuthenticated,
-    driveFileId,
+    remoteFileId,
     syncState,
     googleClientId,
     setGoogleClientId,
-    handleGoogleLogin,
+    handleLogin,
     handleLogout,
-    performFullSync
+    performFullSync,
+    providerName: provider.name
   };
 }

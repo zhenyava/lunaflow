@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { eventsEqual } from './useGoogleSync';
+import { eventsEqual } from './useRemoteSync';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
-describe('useGoogleSync - eventsEqual', () => {
+describe('useRemoteSync - eventsEqual', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();

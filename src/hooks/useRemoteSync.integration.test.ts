@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useGoogleSync } from './useGoogleSync';
+import { useRemoteSync } from './useRemoteSync';
 import * as googleService from '../services/googleService';
+import { googleDriveProvider } from '../storageProviders/GoogleDriveProvider';
 
 vi.mock('../services/googleService', () => ({
   initializeGoogleApi: vi.fn((onInit) => onInit(true)),
@@ -14,7 +15,7 @@ vi.mock('../services/googleService', () => ({
   ensureValidToken: vi.fn(() => Promise.resolve()),
 }));
 
-describe('useGoogleSync integration', () => {
+describe('useRemoteSync integration', () => {
   beforeEach(() => {
     vi.stubGlobal('location', {
       ...window.location,
@@ -43,7 +44,7 @@ describe('useGoogleSync integration', () => {
       hash: '#access_token=test_token&expires_in=3570'
     });
 
-    renderHook(() => useGoogleSync({ events: [], setEvents: vi.fn() }));
+    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider: googleDriveProvider }));
 
     expect(localStorage.setItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN', expect.stringContaining('test_token'));
     expect(window.history.replaceState).toHaveBeenCalled();
@@ -61,11 +62,11 @@ describe('useGoogleSync integration', () => {
     // Mock fetchDriveDataContent to fail with 401
     vi.mocked(googleService.fetchDriveDataContent).mockRejectedValue({ status: 401 });
 
-    const { result } = renderHook(() => useGoogleSync({ events: [], setEvents: mockSetEvents }));
+    const { result } = renderHook(() => useRemoteSync({ events: [], setEvents: mockSetEvents, provider: googleDriveProvider }));
 
     // Wait for the restore session effect
     await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise(resolve => setTimeout(resolve, 50));
     });
 
     expect(googleService.revokeToken).toHaveBeenCalled();

@@ -7,7 +7,7 @@ import DesktopCalendarView from './DesktopCalendarView';
 import MobileControls from './MobileControls';
 import DayDetailsPanel from './DayDetailsPanel';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { useGoogleSync } from '../hooks/useGoogleSync';
+import { useRemoteSync } from '../hooks/useRemoteSync';
 import { useCycleStats } from '../hooks/useCycleStats';
 
 // Generate a range of months for the Mobile "Infinite" list
@@ -46,11 +46,11 @@ function CalendarApp() {
     syncState,
     googleClientId,
     setGoogleClientId,
-    handleGoogleLogin,
+    handleLogin,
     handleLogout,
     performFullSync,
-    driveFileId
-  } = useGoogleSync({ 
+    remoteFileId
+  } = useRemoteSync({ 
       events: allRecords, // Pass raw records for sync
       setEvents
   });
@@ -116,8 +116,8 @@ function CalendarApp() {
         setActiveType={setActiveType}
         isAuthenticated={isAuthenticated}
         syncState={syncState}
-        onSync={() => driveFileId && performFullSync(driveFileId)}
-        onLogin={handleGoogleLogin}
+        onSync={() => remoteFileId && performFullSync(remoteFileId)}
+        onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
         googleClientId={googleClientId}
