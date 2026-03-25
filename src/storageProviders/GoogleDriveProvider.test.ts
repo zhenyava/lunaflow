@@ -3,8 +3,8 @@ import { GoogleDriveProvider } from './GoogleDriveProvider';
 import type { DailyRecord, GoogleToken } from '../types';
 import { runProviderComplianceTests } from './providerComplianceTests';
 
-interface MockGapiResult {
-  result: unknown;
+interface MockGapiResult<T = unknown> {
+  result: T;
 }
 
 describe('GoogleDriveProvider', () => {
@@ -27,7 +27,7 @@ describe('GoogleDriveProvider', () => {
         search: ''
       },
       gapi: {
-        load: vi.fn((lib, cb) => cb()),
+        load: vi.fn((_lib, cb) => cb()),
         client: {
           init: vi.fn().mockResolvedValue(undefined),
           getToken: vi.fn(),
@@ -156,12 +156,12 @@ describe('GoogleDriveProvider', () => {
       // 1. Mock finding the folder
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
         result: { files: [{ id: 'folder-id', name: 'LunaFlow' }] }
-      } as MockGapiResult);
+      } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
       
       // 2. Mock finding the file
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
         result: { files: [{ id: 'file-id', name: 'lunaflow_data.json' }] }
-      } as MockGapiResult);
+      } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
 
       const fileId = await provider.ensureFileExists();
       expect(fileId).toBe('file-id');
