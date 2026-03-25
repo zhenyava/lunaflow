@@ -29,3 +29,5 @@ screenshots/
 .env.local
 .env.*.local
 .vercel/
+.vercel
+.env*.local
