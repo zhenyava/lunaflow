@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
-
 interface HeaderProps {
     avgCycleLength: number | null;
     avgPeriodDuration: number | null;
@@ -12,7 +11,7 @@ interface HeaderProps {
     syncState: SyncState;
     onSync: () => void;
     onLogin: () => void;
-    
+
     // Settings Props
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;

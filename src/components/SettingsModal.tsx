@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { FOLDER_NAME, GOOGLE_CLIENT_ID } from '../constants';
+import { FOLDER_NAME } from '../constants';
 import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
 
 interface SettingsModalProps {
@@ -22,14 +22,9 @@ export default function SettingsModal({
     onLogout
 }: SettingsModalProps) {
     const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-    
-    // Internal state for Google Client ID
-    const [googleClientId, setGoogleClientId] = useState(() => {
-        return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
-    });
 
-    const resetClientId = () => {
-        if(confirm("Reset all settings?")) {
+    const resetData = () => {
+        if(confirm("Reset all settings and local data? This cannot be undone.")) {
             localStorage.clear();
             window.location.reload();
         }
@@ -38,6 +33,7 @@ export default function SettingsModal({
     if (!isOpen) return null;
 
     const providers = storageProviderRegistry.getAllProviders();
+    const activeProvider = storageProviderRegistry.getProvider(selectedProviderId);
 
     return (
         <div className="max-w-md mx-auto mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm animate-in slide-in-from-top-2 absolute left-0 right-0 md:relative md:left-auto md:right-auto shadow-xl md:shadow-none z-50 md:z-auto max-h-[85vh] overflow-y-auto">
@@ -72,25 +68,13 @@ export default function SettingsModal({
                  
                  {!isAuthenticated ? (
                      <div className="space-y-2">
-                         {selectedProviderId === 'google-drive' && !googleClientId && (
-                             <input 
-                                type="text" 
-                                placeholder="Enter Google Client ID" 
-                                className="w-full text-xs p-2 border rounded"
-                                onChange={(e) => {
-                                    setGoogleClientId(e.target.value);
-                                    localStorage.setItem('LUNA_GOOGLE_CLIENT_ID', e.target.value);
-                                }}
-                                value={googleClientId}
-                             />
-                         )}
                          <button onClick={onLogin} className="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold hover:bg-blue-600">
-                             Connect {providers.find(p => p.id === selectedProviderId)?.name}
+                             Connect {activeProvider.name}
                          </button>
                      </div>
                  ) : (
                      <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
-                         <span className="text-xs text-green-700 font-medium">Synced via {providers.find(p => p.id === selectedProviderId)?.name}</span>
+                         <span className="text-xs text-green-700 font-medium">Synced via {activeProvider.name}</span>
                          <button onClick={onLogout} className="text-xs text-red-500 font-medium">Disconnect</button>
                      </div>
                  )}
@@ -121,7 +105,7 @@ export default function SettingsModal({
 
                  {showAdvancedConfig && (
                      <div className="bg-slate-50 p-3 rounded text-xs space-y-2 animate-in slide-in-from-top-1">
-                         <button onClick={resetClientId} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
+                         <button onClick={resetData} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
                              Reset Application Data
                          </button>
                      </div>
