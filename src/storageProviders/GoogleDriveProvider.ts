@@ -4,6 +4,7 @@ import { prepareDataForStorage } from '../services/storageService';
 import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
 
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const LUNA_AUTH_TOKEN = 'lunaflow_auth_token';
 
 interface GapiFileResult<T = unknown> {
   result: T;
@@ -58,7 +59,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
           expires_at: expiresAt
         };
         
-        localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(token));
+        localStorage.setItem(LUNA_AUTH_TOKEN, JSON.stringify(token));
         
         // Clean the URL hash
         window.history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -104,7 +105,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
         await fetch('/api/auth/logout');
         
         // Clear local state
-        localStorage.removeItem('LUNA_AUTH_TOKEN');
+        localStorage.removeItem(LUNA_AUTH_TOKEN);
         if (window.gapi && window.gapi.client) {
             window.gapi.client.setToken(null);
         }
@@ -233,13 +234,13 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
   }
 
   isAuthenticated(): boolean {
-    const token = localStorage.getItem('LUNA_AUTH_TOKEN');
+    const token = localStorage.getItem(LUNA_AUTH_TOKEN);
     return !!token;
   }
 
   async restoreSession(): Promise<string | null> {
     try {
-      const storedTokenStr = localStorage.getItem('LUNA_AUTH_TOKEN');
+      const storedTokenStr = localStorage.getItem(LUNA_AUTH_TOKEN);
       if (storedTokenStr) {
         const token: GoogleToken = JSON.parse(storedTokenStr);
         this.restoreGapiSession(token);
@@ -250,7 +251,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
       }
     } catch (error) {
       console.error('Google session restoration failed', error);
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
+      localStorage.removeItem(LUNA_AUTH_TOKEN);
     }
     return null;
   }
@@ -268,7 +269,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
    * Internal helper to check if the current token is expired and automatically refreshes it via the backend.
    */
   private async ensureValidToken(): Promise<GoogleToken> {
-    const storedStr = localStorage.getItem('LUNA_AUTH_TOKEN');
+    const storedStr = localStorage.getItem(LUNA_AUTH_TOKEN);
     if (!storedStr) throw new Error("No token found");
 
     const token: GoogleToken = JSON.parse(storedStr);
@@ -301,7 +302,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
         expires_at: expiresAt
       };
 
-      localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(newToken));
+      localStorage.setItem(LUNA_AUTH_TOKEN, JSON.stringify(newToken));
       this.restoreGapiSession(newToken);
 
       if (window.dataLayer) {
@@ -313,7 +314,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
       console.error("Token refresh error", error);
       // Token is fully dead, wipe it
       if (window.gapi && window.gapi.client) window.gapi.client.setToken(null);
-      localStorage.removeItem('LUNA_AUTH_TOKEN');
+      localStorage.removeItem(LUNA_AUTH_TOKEN);
       throw new Error("Unauthorized");
     }
   }

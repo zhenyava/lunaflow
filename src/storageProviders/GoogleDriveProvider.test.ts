@@ -127,7 +127,7 @@ describe('GoogleDriveProvider', () => {
       await provider.fetchData('file-id');
 
       expect(fetch).toHaveBeenCalledWith('/api/auth/refresh');
-      expect(localStorage.setItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN', expect.stringContaining('new_token'));
+      expect(localStorage.setItem).toHaveBeenCalledWith('lunaflow_auth_token', expect.stringContaining('new_token'));
       expect(window.gapi.client.setToken).toHaveBeenCalled();
     });
   });
@@ -138,7 +138,7 @@ describe('GoogleDriveProvider', () => {
 
       expect(fetch).toHaveBeenCalledWith('/api/auth/logout');
       expect(window.gapi.client.setToken).toHaveBeenCalledWith(null);
-      expect(localStorage.removeItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN');
+      expect(localStorage.removeItem).toHaveBeenCalledWith('lunaflow_auth_token');
     });
   });
 
