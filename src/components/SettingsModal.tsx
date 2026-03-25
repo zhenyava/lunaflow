@@ -1,29 +1,24 @@
-import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { FOLDER_NAME } from '../constants';
+import type { ICloudStorageProvider } from '../cloudStorage';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isAuthenticated: boolean;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
-    onLogin: () => void;
+    availableProviders: ICloudStorageProvider[];
+    onLogin: (providerId: string) => void;
     onLogout: () => void;
 }
 
 export default function SettingsModal({
     isOpen,
     isAuthenticated,
-    googleClientId,
-    setGoogleClientId,
+    availableProviders,
     onLogin,
     onLogout
 }: SettingsModalProps) {
-    const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-
-    const resetClientId = () => {
-        if(confirm("Reset all settings?")) {
+    const resetAppData = () => {
+        if (confirm('Reset all settings?')) {
             localStorage.clear();
             window.location.reload();
         }
@@ -37,43 +32,42 @@ export default function SettingsModal({
                 <span className="font-semibold text-gray-700">App Settings</span>
              </div>
 
-             {/* Google Sync Section */}
+             {/* Cloud Sync Section */}
              <div className="bg-white p-3 rounded-lg border border-gray-100 mb-3 shadow-sm">
                  <div className="flex items-center gap-2 mb-2">
                      <Cloud size={16} className="text-blue-500"/>
-                     <h3 className="font-medium text-gray-800">Google Backup</h3>
+                     <h3 className="font-medium text-gray-800">Cloud Backup</h3>
                  </div>
-                 <p className="text-xs text-gray-500 mb-3">Sync your data to a folder named "{FOLDER_NAME}" in your Google Drive.</p>
-                 
-                 {!isAuthenticated ? (
-                     <div className="space-y-2">
-                         {!googleClientId && (
-                             <input 
-                                type="text" 
-                                placeholder="Enter Google Client ID" 
-                                className="w-full text-xs p-2 border rounded"
-                                onChange={(e) => {
-                                    setGoogleClientId(e.target.value);
-                                    localStorage.setItem('LUNA_GOOGLE_CLIENT_ID', e.target.value);
-                                }}
-                                value={googleClientId}
-                             />
+
+                 {availableProviders.map((provider) => (
+                     <div key={provider.id}>
+                         <p className="text-xs text-gray-500 mb-3">
+                             Sync your data using {provider.displayName}.
+                         </p>
+                         {!isAuthenticated ? (
+                             <button
+                                 onClick={() => onLogin(provider.id)}
+                                 className="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold hover:bg-blue-600"
+                             >
+                                 Connect {provider.displayName}
+                             </button>
+                         ) : (
+                             <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
+                                 <span className="text-xs text-green-700 font-medium">
+                                     Synced via {provider.displayName}
+                                 </span>
+                                 <button onClick={onLogout} className="text-xs text-red-500 font-medium">
+                                     Disconnect
+                                 </button>
+                             </div>
                          )}
-                         <button onClick={onLogin} className="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold hover:bg-blue-600">
-                             Connect Google Drive
-                         </button>
                      </div>
-                 ) : (
-                     <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
-                         <span className="text-xs text-green-700 font-medium">Synced</span>
-                         <button onClick={onLogout} className="text-xs text-red-500 font-medium">Disconnect</button>
-                     </div>
-                 )}
+                 ))}
              </div>
 
              {/* Navigation Links */}
              <div className="space-y-1 mb-3">
-                 <a 
+                 <a
                      href="https://forms.gle/CAMiGKwvQ99RCzdC6"
                      target="_blank"
                      rel="noopener noreferrer"
@@ -84,23 +78,19 @@ export default function SettingsModal({
                  </a>
              </div>
 
-             {/* Advanced Toggle */}
+             {/* Advanced Section */}
              <div className="border-t border-gray-100 pt-2">
-                 <button 
-                    onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
-                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-2 w-full"
-                 >
-                     <Settings size={12} />
-                     {showAdvancedConfig ? 'Hide Advanced Config' : 'Show Advanced Config'}
-                 </button>
-
-                 {showAdvancedConfig && (
+                 <details className="group">
+                     <summary className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 cursor-pointer list-none mb-2">
+                         <Settings size={12} />
+                         <span>Advanced Config</span>
+                     </summary>
                      <div className="bg-slate-50 p-3 rounded text-xs space-y-2 animate-in slide-in-from-top-1">
-                         <button onClick={resetClientId} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
+                         <button onClick={resetAppData} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
                              Reset Application Data
                          </button>
                      </div>
-                 )}
+                 </details>
              </div>
         </div>
     );

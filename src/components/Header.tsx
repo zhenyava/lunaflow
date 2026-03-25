@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
+import type { ICloudStorageProvider } from '../cloudStorage';
 import SettingsModal from './SettingsModal';
 
 interface HeaderProps {
@@ -11,13 +12,12 @@ interface HeaderProps {
     isAuthenticated: boolean;
     syncState: SyncState;
     onSync: () => void;
-    onLogin: () => void;
-    
+    onLogin: (providerId: string) => void;
+
     // Settings Props
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
+    availableProviders: ICloudStorageProvider[];
     onLogout: () => void;
 
     // Edit Mode Props
@@ -64,8 +64,7 @@ export default function Header({
     onLogin,
     isSettingsOpen,
     setSettingsOpen,
-    googleClientId,
-    setGoogleClientId,
+    availableProviders,
     onLogout,
     isEditMode,
     setIsEditMode,
@@ -160,10 +159,10 @@ export default function Header({
                             <Edit3 size={16} />
                             <span>{isEditMode ? 'Done Editing' : 'Edit Dates'}</span>
                         </button>
-                        <button 
-                            onClick={() => isAuthenticated ? onSync() : onLogin()}
+                        <button
+                            onClick={() => isAuthenticated ? onSync() : onLogin(availableProviders[0]?.id ?? 'google-drive')}
                             className={`p-2 rounded-full transition-colors ${isAuthenticated ? 'hover:bg-green-50' : 'hover:bg-gray-100'}`}
-                            title={isAuthenticated ? "Click to Force Sync" : "Connect Google Drive"}
+                            title={isAuthenticated ? "Click to Force Sync" : "Connect Cloud Storage"}
                         >
                             {getSyncIcon()}
                         </button>
@@ -189,12 +188,11 @@ export default function Header({
                </div>
             </div>
     
-            <SettingsModal 
+            <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}
-                googleClientId={googleClientId}
-                setGoogleClientId={setGoogleClientId}
+                availableProviders={availableProviders}
                 onLogin={onLogin}
                 onLogout={onLogout}
             />

@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import loginHandler from './login';
 import callbackHandler from './callback';
 import refreshHandler from './refresh';
-import logoutHandler from './logout';
+import logoutHandler from '../logout';
 import { createRequest, createResponse } from 'node-mocks-http';
 import { getIronSession, IronSession } from 'iron-session';
-import { SessionData } from '../utils/session.js';
+import { SessionData } from '../../utils/session.js';
 
 vi.mock('iron-session', () => ({
   getIronSession: vi.fn(),

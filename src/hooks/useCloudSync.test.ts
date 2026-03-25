@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { eventsEqual } from './useGoogleSync';
+import { eventsEqual } from './useCloudSync';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
-describe('useGoogleSync - eventsEqual', () => {
-
+describe('useCloudSync - eventsEqual', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
@@ -13,6 +12,7 @@ describe('useGoogleSync - eventsEqual', () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
   it('returns true for identical arrays', () => {
     const arr1: DailyRecord[] = [
       makePeriodRecord('2024-01-01'),
@@ -26,9 +26,7 @@ describe('useGoogleSync - eventsEqual', () => {
   });
 
   it('returns false when arrays have different lengths', () => {
-    const arr1: DailyRecord[] = [
-      makePeriodRecord('2024-01-01'),
-    ];
+    const arr1: DailyRecord[] = [makePeriodRecord('2024-01-01')];
     const arr2: DailyRecord[] = [
       makePeriodRecord('2024-01-01'),
       makeOvulationRecord('2024-01-14'),
@@ -37,19 +35,13 @@ describe('useGoogleSync - eventsEqual', () => {
   });
 
   it('returns false when a date is different', () => {
-    const arr1: DailyRecord[] = [
-      makePeriodRecord('2024-01-01'),
-    ];
-    const arr2: DailyRecord[] = [
-      makePeriodRecord('2024-01-02'),
-    ];
+    const arr1: DailyRecord[] = [makePeriodRecord('2024-01-01')];
+    const arr2: DailyRecord[] = [makePeriodRecord('2024-01-02')];
     expect(eventsEqual(arr1, arr2)).toBe(false);
   });
 
   it('returns false when updatedAt is different', () => {
-    const arr1: DailyRecord[] = [
-      makePeriodRecord('2024-01-01'),
-    ];
+    const arr1: DailyRecord[] = [makePeriodRecord('2024-01-01')];
     const arr2: DailyRecord[] = [
       { date: '2024-01-01', updatedAt: Date.now() + 100, period: {} },
     ];

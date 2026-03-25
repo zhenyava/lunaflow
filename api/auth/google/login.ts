@@ -1,5 +1,5 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { getRedirectUri } from '../utils/url.js';
+import { getRedirectUri } from '../../utils/url.js';
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const clientId = process.env.VITE_GOOGLE_CLIENT_ID;
@@ -9,7 +9,6 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
 
   const redirectUri = getRedirectUri(req);
 
-  // Required scopes for Google Drive
   const scopes = [
     'https://www.googleapis.com/auth/drive.file'
   ].join(' ');
@@ -20,7 +19,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   authUrl.searchParams.append('response_type', 'code');
   authUrl.searchParams.append('scope', scopes);
   authUrl.searchParams.append('access_type', 'offline');
-  authUrl.searchParams.append('prompt', 'consent'); // Forces refresh token on first login
+  authUrl.searchParams.append('prompt', 'consent');
 
   res.redirect(authUrl.toString());
 }

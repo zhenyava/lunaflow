@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { getIronSession } from 'iron-session';
-import { sessionOptions, SessionData } from '../utils/session.js';
+import { sessionOptions, SessionData } from '../../utils/session.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const session = await getIronSession<SessionData>(req, res, sessionOptions);
@@ -34,8 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error('Google Refresh Error:', data);
       return res.status(tokenResponse.status).json(data);
     }
-    
-    // Apply the 30-second safety buffer on the backend
+
     const safe_expires_in = Math.max(0, data.expires_in - 30);
 
     // Reset the 30-day session timer (rolling session)

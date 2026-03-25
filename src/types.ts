@@ -76,14 +76,6 @@ export interface SyncState {
   lastSynced?: Date;
 }
 
-export interface GoogleToken {
-  access_token: string;
-  expires_in: number;
-  scope: string;
-  token_type: string;
-  expires_at?: number; // Calculated expiration timestamp
-}
-
 /**
  * Helper to create a DailyRecord with period data.
  */
