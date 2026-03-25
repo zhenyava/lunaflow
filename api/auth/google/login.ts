@@ -7,7 +7,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Missing Google Client ID' });
   }
 
-  const redirectUri = getRedirectUri(req);
+  const redirectUri = getRedirectUri(req, 'google');
 
   const scopes = [
     'https://www.googleapis.com/auth/drive.file'

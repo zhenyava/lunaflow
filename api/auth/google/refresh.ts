@@ -35,6 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(tokenResponse.status).json(data);
     }
 
+    // Apply the 30-second safety buffer on the backend
     const safe_expires_in = Math.max(0, data.expires_in - 30);
 
     // Reset the 30-day session timer (rolling session)

@@ -13,6 +13,6 @@ export const getBaseUrl = (req: VercelRequest): string => {
 /**
  * Returns the full absolute URL for the OAuth callback endpoint.
  */
-export const getRedirectUri = (req: VercelRequest): string => {
-  return `${getBaseUrl(req)}/api/auth/google/callback`;
+export const getRedirectUri = (req: VercelRequest, providerPath: string): string => {
+  return `${getBaseUrl(req)}/api/auth/${providerPath}/callback`;
 };

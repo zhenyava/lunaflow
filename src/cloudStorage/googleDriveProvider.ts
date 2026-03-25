@@ -1,6 +1,7 @@
 import type { ICloudStorageProvider, CloudAuthToken } from './ICloudStorageProvider';
 import type { DailyRecord } from '../types';
 import { prepareDataForStorage, parseAndMigrateData } from '../services/storageService';
+import { AUTH_TOKEN_KEY, FOLDER_NAME, APP_DATA_FILENAME } from '../constants';
 
 // Google-specific token shape (internal to this provider)
 interface GoogleToken {
@@ -38,9 +39,6 @@ declare global {
   }
 }
 
-const TOKEN_STORAGE_KEY = 'LUNA_AUTH_TOKEN';
-const FOLDER_NAME = 'LunaFlow';
-const APP_DATA_FILENAME = 'lunaflow_data.json';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
 export class GoogleDriveProvider implements ICloudStorageProvider {
@@ -48,8 +46,6 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
   readonly displayName = 'Google Drive';
 
   private gapiInited = false;
-
-  // ─── initialize ────────────────────────────────────────────────────────────
 
   initialize(): Promise<boolean> {
     return new Promise((resolve) => {
@@ -78,14 +74,10 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
     });
   }
 
-  // ─── login ─────────────────────────────────────────────────────────────────
-
   login(): Promise<void> {
     window.location.href = '/api/auth/google/login';
     return new Promise(() => {});
   }
-
-  // ─── parseCallbackToken ────────────────────────────────────────────────────
 
   parseCallbackToken(): CloudAuthToken | null {
     if (!window.location.hash.includes('access_token=')) return null;
@@ -107,16 +99,14 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
       expires_at: expiresAt,
     };
 
-    localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(token));
+    localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(token));
     window.history.replaceState(null, '', window.location.pathname + window.location.search);
 
     return { accessToken, expiresAt };
   }
 
-  // ─── restoreSession ────────────────────────────────────────────────────────
-
   async restoreSession(): Promise<CloudAuthToken | null> {
-    const storedStr = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const storedStr = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!storedStr) return null;
 
     try {
@@ -129,15 +119,13 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
         expiresAt: token.expires_at ?? 0,
       };
     } catch {
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
       return null;
     }
   }
 
-  // ─── ensureValidToken ──────────────────────────────────────────────────────
-
   async ensureValidToken(): Promise<CloudAuthToken> {
-    const storedStr = localStorage.getItem(TOKEN_STORAGE_KEY);
+    const storedStr = localStorage.getItem(AUTH_TOKEN_KEY);
     if (!storedStr) throw new Error('No token found');
 
     const token: GoogleToken = JSON.parse(storedStr);
@@ -166,7 +154,7 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
         expires_at: expiresAt,
       };
 
-      localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(newToken));
+      localStorage.setItem(AUTH_TOKEN_KEY, JSON.stringify(newToken));
       window.gapi?.client?.setToken(newToken);
 
       if (window.dataLayer) {
@@ -177,12 +165,10 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
     } catch (error) {
       console.error('Token refresh error', error);
       window.gapi?.client?.setToken(null);
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
       throw new Error('Unauthorized');
     }
   }
-
-  // ─── ensureFileExists ──────────────────────────────────────────────────────
 
   async ensureFileExists(): Promise<string> {
     try {
@@ -240,8 +226,6 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
     }
   }
 
-  // ─── uploadData ────────────────────────────────────────────────────────────
-
   async uploadData(fileRef: string, records: DailyRecord[]): Promise<void> {
     const token = await this.ensureValidToken();
     const fileContent = JSON.stringify(prepareDataForStorage(records));
@@ -266,8 +250,6 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
     }
   }
 
-  // ─── fetchData ─────────────────────────────────────────────────────────────
-
   async fetchData(fileRef: string): Promise<DailyRecord[]> {
     try {
       await this.ensureValidToken();
@@ -283,12 +265,10 @@ export class GoogleDriveProvider implements ICloudStorageProvider {
     }
   }
 
-  // ─── logout ────────────────────────────────────────────────────────────────
-
   async logout(): Promise<void> {
     try {
       await fetch('/api/auth/logout');
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      localStorage.removeItem(AUTH_TOKEN_KEY);
       window.gapi?.client?.setToken(null);
     } catch (e) {
       console.warn('Error revoking token', e);

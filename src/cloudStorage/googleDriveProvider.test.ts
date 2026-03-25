@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleDriveProvider } from './googleDriveProvider';
+import { AUTH_TOKEN_KEY } from '../constants';
 
 // Helper to set window.gapi without replacing the entire window object
 function stubGapi() {
@@ -85,7 +86,7 @@ describe('GoogleDriveProvider', () => {
       await expect(provider.ensureValidToken()).rejects.toThrow('Unauthorized');
 
       expect(window.gapi.client.setToken).toHaveBeenCalledWith(null);
-      expect(localStorage.removeItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN');
+      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
     });
   });
 
@@ -97,7 +98,7 @@ describe('GoogleDriveProvider', () => {
 
       expect(fetch).toHaveBeenCalledWith('/api/auth/logout');
       expect(window.gapi.client.setToken).toHaveBeenCalledWith(null);
-      expect(localStorage.removeItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN');
+      expect(localStorage.removeItem).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
     });
   });
 
@@ -120,7 +121,7 @@ describe('GoogleDriveProvider', () => {
       expect(token).not.toBeNull();
       expect(token!.accessToken).toBe('abc123');
       expect(localStorage.setItem).toHaveBeenCalledWith(
-        'LUNA_AUTH_TOKEN',
+        AUTH_TOKEN_KEY,
         expect.stringContaining('abc123')
       );
       expect(window.history.replaceState).toHaveBeenCalled();

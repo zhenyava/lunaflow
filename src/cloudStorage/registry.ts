@@ -2,7 +2,7 @@ import type { ICloudStorageProvider } from './ICloudStorageProvider';
 import { GoogleDriveProvider } from './googleDriveProvider';
 
 const providers = new Map<string, ICloudStorageProvider>();
-const PROVIDER_STORAGE_KEY = 'LUNA_CLOUD_PROVIDER';
+const PROVIDER_STORAGE_KEY = 'lunaflow_cloud_provider';
 
 export function registerProvider(provider: ICloudStorageProvider): void {
   providers.set(provider.id, provider);

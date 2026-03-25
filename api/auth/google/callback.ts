@@ -17,7 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  const redirectUri = getRedirectUri(req);
+  const redirectUri = getRedirectUri(req, 'google');
 
   try {
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
