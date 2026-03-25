@@ -10,6 +10,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useRemoteSync } from '../hooks/useRemoteSync';
 import { useCycleStats } from '../hooks/useCycleStats';
 import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
+import { STORAGE_PROVIDER_KEY } from '../constants';
 
 // Generate a range of months for the Mobile "Infinite" list
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
@@ -33,7 +34,7 @@ function CalendarApp() {
 
   // Provider State
   const [selectedProviderId, setSelectedProviderId] = useState(() => {
-     return localStorage.getItem('LUNA_STORAGE_PROVIDER') || 'google-drive';
+     return localStorage.getItem(STORAGE_PROVIDER_KEY) || 'google-drive';
   });
 
   const provider = useMemo(() => {
@@ -69,7 +70,7 @@ function CalendarApp() {
           await handleLogout();
       }
       setSelectedProviderId(newId);
-      localStorage.setItem('LUNA_STORAGE_PROVIDER', newId);
+      localStorage.setItem(STORAGE_PROVIDER_KEY, newId);
   }, [isAuthenticated, handleLogout]);
 
   // Statistics & Predictions use cleaned events
