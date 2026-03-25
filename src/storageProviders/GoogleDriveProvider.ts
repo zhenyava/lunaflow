@@ -1,5 +1,5 @@
 import type { DailyRecord, GoogleToken } from '../types';
-import { APP_DATA_FILENAME, FOLDER_NAME } from '../constants';
+import { APP_DATA_FILENAME, STORAGE_FOLDER_NAME } from '../constants';
 import { prepareDataForStorage } from '../services/storageService';
 import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
 
@@ -121,7 +121,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
       // 1. Find or create the LunaFlow folder
       let folderId = '';
       const folderResponse = await window.gapi.client.drive.files.list({
-        q: `name = '${FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+        q: `name = '${STORAGE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
         fields: 'files(id, name)',
         spaces: 'drive'
       });
@@ -131,7 +131,7 @@ export class GoogleDriveProvider implements RemoteStorageProvider {
         folderId = folders[0].id;
       } else {
         const folderMetadata = {
-          name: FOLDER_NAME,
+          name: STORAGE_FOLDER_NAME,
           mimeType: 'application/vnd.google-apps.folder'
         };
         const createFolderResponse = await window.gapi.client.drive.files.create({
