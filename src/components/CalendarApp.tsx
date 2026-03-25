@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
 import { Edit3 } from 'lucide-react';
 import Header from './Header';
@@ -9,6 +9,7 @@ import DayDetailsPanel from './DayDetailsPanel';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useRemoteSync } from '../hooks/useRemoteSync';
 import { useCycleStats } from '../hooks/useCycleStats';
+import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
 
 // Generate a range of months for the Mobile "Infinite" list
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
@@ -30,6 +31,15 @@ function CalendarApp() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // Provider State
+  const [selectedProviderId, setSelectedProviderId] = useState(() => {
+     return localStorage.getItem('LUNA_STORAGE_PROVIDER') || 'google-drive';
+  });
+
+  const provider = useMemo(() => {
+     return storageProviderRegistry.getProvider(selectedProviderId);
+  }, [selectedProviderId]);
+
   // Custom Hooks
   const { 
     events,         // Filtered (isDeleted: false)
@@ -44,16 +54,23 @@ function CalendarApp() {
   const {
     isAuthenticated,
     syncState,
-    googleClientId,
-    setGoogleClientId,
     handleLogin,
     handleLogout,
     performFullSync,
     remoteFileId
   } = useRemoteSync({ 
       events: allRecords, // Pass raw records for sync
-      setEvents
+      setEvents,
+      provider
   });
+
+  const handleProviderChange = useCallback(async (newId: string) => {
+      if (isAuthenticated) {
+          await handleLogout();
+      }
+      setSelectedProviderId(newId);
+      localStorage.setItem('LUNA_STORAGE_PROVIDER', newId);
+  }, [isAuthenticated, handleLogout]);
 
   // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
@@ -120,8 +137,8 @@ function CalendarApp() {
         onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
-        googleClientId={googleClientId}
-        setGoogleClientId={setGoogleClientId}
+        selectedProviderId={selectedProviderId}
+        onProviderChange={handleProviderChange}
         onLogout={handleLogout}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}

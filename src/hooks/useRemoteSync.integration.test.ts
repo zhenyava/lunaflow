@@ -1,75 +1,58 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRemoteSync } from './useRemoteSync';
-import * as googleService from '../services/googleService';
-import { googleDriveProvider } from '../storageProviders/GoogleDriveProvider';
+import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
-vi.mock('../services/googleService', () => ({
-  initializeGoogleApi: vi.fn((onInit) => onInit(true)),
-  signInToGoogle: vi.fn(),
-  ensureDriveFileExists: vi.fn(() => Promise.resolve('file-id')),
-  uploadDriveData: vi.fn(() => Promise.resolve()),
-  fetchDriveDataContent: vi.fn(() => Promise.resolve({ records: [] })),
-  revokeToken: vi.fn(() => Promise.resolve()),
-  restoreGapiSession: vi.fn(),
-  ensureValidToken: vi.fn(() => Promise.resolve()),
-}));
+class MockStorageProvider implements RemoteStorageProvider {
+  id = 'mock-provider';
+  name = 'Mock Provider';
+  
+  initialize = vi.fn((onInit) => onInit(true));
+  signIn = vi.fn(() => Promise.resolve());
+  signOut = vi.fn(() => Promise.resolve());
+  ensureFileExists = vi.fn(() => Promise.resolve('mock-file-id'));
+  fetchData = vi.fn(() => Promise.resolve({ records: [] }));
+  uploadData = vi.fn(() => Promise.resolve());
+  isAuthenticated = vi.fn(() => true);
+  restoreSession = vi.fn(() => Promise.resolve('mock-file-id'));
+  handleCallback = vi.fn();
+}
 
 describe('useRemoteSync integration', () => {
+  let provider: MockStorageProvider;
+
   beforeEach(() => {
-    vi.stubGlobal('location', {
-      ...window.location,
-      hash: '',
-      pathname: '/',
-      search: ''
-    });
-    vi.stubGlobal('history', {
-      replaceState: vi.fn()
-    });
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-    });
+    provider = new MockStorageProvider();
   });
 
   afterEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should parse access_token from URL hash on mount', async () => {
-    // Mock hash fragment
-    vi.stubGlobal('location', {
-      ...window.location,
-      hash: '#access_token=test_token&expires_in=3570'
-    });
-
-    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider: googleDriveProvider }));
-
-    expect(localStorage.setItem).toHaveBeenCalledWith('LUNA_AUTH_TOKEN', expect.stringContaining('test_token'));
-    expect(window.history.replaceState).toHaveBeenCalled();
+  it('should call handleCallback on mount', () => {
+    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider }));
+    expect(provider.handleCallback).toHaveBeenCalled();
   });
 
-  it('should handle unauthorized error by logging out (Scenario 3)', async () => {
+  it('should initialize the provider on mount', () => {
+    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider }));
+    expect(provider.initialize).toHaveBeenCalled();
+  });
+
+  it('should handle unauthorized error by logging out', async () => {
     const mockSetEvents = vi.fn();
     
-    // Simulate being logged in
-    vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify({
-      access_token: 'valid',
-      expires_at: Date.now() + 100000
-    }));
-    
-    // Mock fetchDriveDataContent to fail with 401
-    vi.mocked(googleService.fetchDriveDataContent).mockRejectedValue({ status: 401 });
+    // Mock fetchData to fail with 401
+    provider.fetchData.mockRejectedValue({ status: 401 });
 
-    const { result } = renderHook(() => useRemoteSync({ events: [], setEvents: mockSetEvents, provider: googleDriveProvider }));
+    const { result } = renderHook(() => useRemoteSync({ events: [], setEvents: mockSetEvents, provider }));
 
     // Wait for the restore session effect
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 50));
     });
 
-    expect(googleService.revokeToken).toHaveBeenCalled();
+    expect(provider.signOut).toHaveBeenCalled();
     expect(result.current.isAuthenticated).toBe(false);
   });
 });

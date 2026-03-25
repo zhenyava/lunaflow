@@ -19,17 +19,19 @@ This document outlines the approach used to store, version, and migrate data in 
 
 ## Storage Abstraction
 
-To support multiple storage vendors (e.g., Google Drive, Dropbox, OneDrive), LunaFlow uses an abstraction layer located in `src/storageProviders/`.
+To support multiple storage vendors (e.g., Google Drive, Dropbox, OneDrive), LunaFlow uses a robust abstraction layer located in `src/storageProviders/`.
 
-1. **`RemoteStorageProvider`**: A TypeScript interface that defines the required methods for any remote storage implementation (`initialize`, `signIn`, `signOut`, `fetchData`, `uploadData`, etc.).
-2. **`GoogleDriveProvider`**: The primary implementation of the `RemoteStorageProvider` interface, which wraps the `googleService.ts` transport layer.
-3. **`useRemoteSync` Hook**: This hook (renamed from `useGoogleSync`) is now provider-agnostic. It accepts a `RemoteStorageProvider` instance (defaulting to `googleDriveProvider`) and handles the high-level synchronization logic, such as:
+1. **`RemoteStorageProvider` Interface**: A TypeScript interface that defines the required methods for any remote storage implementation (`id`, `name`, `initialize`, `signIn`, `signOut`, `fetchData`, `uploadData`, `restoreSession`, and an optional `handleCallback` for OAuth redirects).
+2. **`StorageProviderRegistry`**: A central registry that maps string IDs (e.g., `google-drive`) to their corresponding `RemoteStorageProvider` instances. This allows the application to dynamically resolve the active provider based on user settings.
+3. **`GoogleDriveProvider`**: The primary implementation of the `RemoteStorageProvider` interface, which wraps the `googleService.ts` transport layer.
+4. **`useRemoteSync` Hook**: This hook is entirely provider-agnostic. It accepts a `RemoteStorageProvider` instance (resolved from the registry in `CalendarApp.tsx`) and handles the high-level synchronization logic, such as:
    - Conflict resolution (merging local and remote data).
    - Auto-saving local changes to remote.
    - Polling/Syncing on window focus.
    - Session restoration.
+   - Triggering the provider's `handleCallback` method during initialization.
 
-This architecture allows for adding new storage providers without modifying the core synchronization logic.
+This architecture allows for adding new storage providers without modifying the core synchronization logic or application structure. Simply create a new class implementing `RemoteStorageProviderInterface` and register it in the `StorageProviderRegistry`.
 
 ## The Migration Pipeline
 

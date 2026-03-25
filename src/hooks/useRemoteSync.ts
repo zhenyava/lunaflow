@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DailyRecord, GoogleToken, SyncState } from '../types';
+import type { DailyRecord, SyncState } from '../types';
 import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
-import { GOOGLE_CLIENT_ID, GOOGLE_SCOPES } from '../constants';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
-import { googleDriveProvider } from '../storageProviders/GoogleDriveProvider';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
   if (a.length !== b.length) return false;
@@ -20,47 +18,21 @@ export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
 interface UseRemoteSyncProps {
   events: DailyRecord[];
   setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
-  provider?: RemoteStorageProvider;
+  provider: RemoteStorageProvider;
 }
 
-export function useRemoteSync({ events, setEvents, provider = googleDriveProvider }: UseRemoteSyncProps) {
+export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
-  
-  // Use Client ID from constants or fallback to local storage
-  const [googleClientId, setGoogleClientId] = useState(() => {
-     return GOOGLE_CLIENT_ID || localStorage.getItem('LUNA_GOOGLE_CLIENT_ID') || '';
-  });
 
-  // Extract hash token on mount (specific to current Google flow)
-  // Note: This might need to move into provider if other providers use different redirect flows
+  // Handle any provider-specific callback logic (e.g., parsing OAuth hash tokens)
   useEffect(() => {
-    if (window.location.hash.includes('access_token=')) {
-      const params = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = params.get('access_token');
-      const expiresInStr = params.get('expires_in');
-      
-      if (accessToken && expiresInStr) {
-        const expiresIn = parseInt(expiresInStr, 10);
-        const expiresAt = Date.now() + (expiresIn * 1000);
-        
-        const token: GoogleToken = {
-          access_token: accessToken,
-          expires_in: expiresIn,
-          scope: GOOGLE_SCOPES,
-          token_type: 'Bearer',
-          expires_at: expiresAt
-        };
-        
-        localStorage.setItem('LUNA_AUTH_TOKEN', JSON.stringify(token));
-        
-        // Clean the URL hash
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
+    if (provider.handleCallback) {
+      provider.handleCallback();
     }
-  }, []);
+  }, [provider]);
 
   // Init Storage Provider API
   useEffect(() => {
@@ -186,8 +158,6 @@ export function useRemoteSync({ events, setEvents, provider = googleDriveProvide
     isAuthenticated,
     remoteFileId,
     syncState,
-    googleClientId,
-    setGoogleClientId,
     handleLogin,
     handleLogout,
     performFullSync,

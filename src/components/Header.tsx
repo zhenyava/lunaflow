@@ -16,8 +16,8 @@ interface HeaderProps {
     // Settings Props
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
+    selectedProviderId: string;
+    onProviderChange: (id: string) => void;
     onLogout: () => void;
 
     // Edit Mode Props
@@ -64,8 +64,8 @@ export default function Header({
     onLogin,
     isSettingsOpen,
     setSettingsOpen,
-    googleClientId,
-    setGoogleClientId,
+    selectedProviderId,
+    onProviderChange,
     onLogout,
     isEditMode,
     setIsEditMode,
@@ -163,7 +163,7 @@ export default function Header({
                         <button 
                             onClick={() => isAuthenticated ? onSync() : onLogin()}
                             className={`p-2 rounded-full transition-colors ${isAuthenticated ? 'hover:bg-green-50' : 'hover:bg-gray-100'}`}
-                            title={isAuthenticated ? "Click to Force Sync" : "Connect Google Drive"}
+                            title={isAuthenticated ? "Click to Force Sync" : "Connect Provider"}
                         >
                             {getSyncIcon()}
                         </button>
@@ -193,8 +193,8 @@ export default function Header({
                 isOpen={isSettingsOpen}
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}
-                googleClientId={googleClientId}
-                setGoogleClientId={setGoogleClientId}
+                selectedProviderId={selectedProviderId}
+                onProviderChange={onProviderChange}
                 onLogin={onLogin}
                 onLogout={onLogout}
             />

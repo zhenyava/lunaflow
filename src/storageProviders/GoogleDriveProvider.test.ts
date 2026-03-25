@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GoogleDriveProvider } from './GoogleDriveProvider';
 import * as googleService from '../services/googleService';
 import type { DailyRecord } from '../types';
+import { runProviderComplianceTests } from './providerComplianceTests';
 
 vi.mock('../services/googleService', () => ({
   initializeGoogleApi: vi.fn(),
@@ -22,8 +23,12 @@ describe('GoogleDriveProvider', () => {
     localStorage.clear();
   });
 
-  it('should have the correct name', () => {
+  // Run the shared compliance test suite
+  runProviderComplianceTests(new GoogleDriveProvider());
+
+  it('should have the correct name and id', () => {
     expect(provider.name).toBe('Google Drive');
+    expect(provider.id).toBe('google-drive');
   });
 
   it('should initialize Google API', () => {

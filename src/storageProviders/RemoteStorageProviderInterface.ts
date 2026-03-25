@@ -6,9 +6,19 @@ import type { DailyRecord } from '../types';
  */
 export interface RemoteStorageProvider {
   /**
+   * The unique identifier for the storage provider (e.g., 'google-drive').
+   */
+  readonly id: string;
+
+  /**
    * The name of the storage provider (e.g., 'Google Drive').
    */
   readonly name: string;
+
+  /**
+   * Handles any necessary OAuth callback logic (e.g., parsing URL hashes).
+   */
+  handleCallback?(): void;
 
   /**
    * Initializes the storage provider's SDK or API.
