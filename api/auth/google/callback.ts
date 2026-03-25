@@ -44,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (refresh_token) {
       const session = await getIronSession<SessionData>(req, res, sessionOptions);
       session.refreshToken = refresh_token;
-      session.providerId = 'google-drive';
       await session.save();
     }
 

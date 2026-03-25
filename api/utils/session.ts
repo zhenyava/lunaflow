@@ -2,7 +2,6 @@ import { SessionOptions } from 'iron-session';
 
 export interface SessionData {
   refreshToken?: string;
-  providerId?: string;
 }
 
 const defaultPassword = 'complex_password_at_least_32_characters_long';
