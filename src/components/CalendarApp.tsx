@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
 import { Edit3 } from 'lucide-react';
 import Header from './Header';
@@ -7,8 +7,10 @@ import DesktopCalendarView from './DesktopCalendarView';
 import MobileControls from './MobileControls';
 import DayDetailsPanel from './DayDetailsPanel';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { useGoogleSync } from '../hooks/useGoogleSync';
+import { useRemoteSync } from '../hooks/useRemoteSync';
 import { useCycleStats } from '../hooks/useCycleStats';
+import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
+import { STORAGE_PROVIDER_KEY } from '../constants';
 
 // Generate a range of months for the Mobile "Infinite" list
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
@@ -30,6 +32,15 @@ function CalendarApp() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // Provider State
+  const [selectedProviderId, setSelectedProviderId] = useState(() => {
+     return localStorage.getItem(STORAGE_PROVIDER_KEY) || 'google-drive';
+  });
+
+  const provider = useMemo(() => {
+     return storageProviderRegistry.getProvider(selectedProviderId);
+  }, [selectedProviderId]);
+
   // Custom Hooks
   const { 
     events,         // Filtered (isDeleted: false)
@@ -44,16 +55,23 @@ function CalendarApp() {
   const {
     isAuthenticated,
     syncState,
-    googleClientId,
-    setGoogleClientId,
-    handleGoogleLogin,
+    handleLogin,
     handleLogout,
     performFullSync,
-    driveFileId
-  } = useGoogleSync({ 
+    remoteFileId
+  } = useRemoteSync({ 
       events: allRecords, // Pass raw records for sync
-      setEvents
+      setEvents,
+      provider
   });
+
+  const handleProviderChange = useCallback(async (newId: string) => {
+      if (isAuthenticated) {
+          await handleLogout();
+      }
+      setSelectedProviderId(newId);
+      localStorage.setItem(STORAGE_PROVIDER_KEY, newId);
+  }, [isAuthenticated, handleLogout]);
 
   // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
@@ -116,12 +134,12 @@ function CalendarApp() {
         setActiveType={setActiveType}
         isAuthenticated={isAuthenticated}
         syncState={syncState}
-        onSync={() => driveFileId && performFullSync(driveFileId)}
-        onLogin={handleGoogleLogin}
+        onSync={() => remoteFileId && performFullSync(remoteFileId)}
+        onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
-        googleClientId={googleClientId}
-        setGoogleClientId={setGoogleClientId}
+        selectedProviderId={selectedProviderId}
+        onProviderChange={handleProviderChange}
         onLogout={handleLogout}
         isEditMode={isEditMode}
         setIsEditMode={setIsEditMode}

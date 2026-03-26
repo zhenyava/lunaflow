@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { FOLDER_NAME } from '../constants';
+import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isAuthenticated: boolean;
-    googleClientId: string;
-    setGoogleClientId: (id: string) => void;
+    selectedProviderId: string;
+    onProviderChange: (id: string) => void;
     onLogin: () => void;
     onLogout: () => void;
 }
@@ -15,15 +15,15 @@ interface SettingsModalProps {
 export default function SettingsModal({
     isOpen,
     isAuthenticated,
-    googleClientId,
-    setGoogleClientId,
+    selectedProviderId,
+    onProviderChange,
     onLogin,
     onLogout
 }: SettingsModalProps) {
     const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
 
-    const resetClientId = () => {
-        if(confirm("Reset all settings?")) {
+    const resetData = () => {
+        if(confirm("Reset all settings and local data? This cannot be undone.")) {
             localStorage.clear();
             window.location.reload();
         }
@@ -31,41 +31,45 @@ export default function SettingsModal({
 
     if (!isOpen) return null;
 
+    const providers = storageProviderRegistry.getAllProviders();
+    const activeProvider = storageProviderRegistry.getProvider(selectedProviderId);
+
     return (
         <div className="max-w-md mx-auto mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm animate-in slide-in-from-top-2 absolute left-0 right-0 md:relative md:left-auto md:right-auto shadow-xl md:shadow-none z-50 md:z-auto max-h-[85vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-4">
                 <span className="font-semibold text-gray-700">App Settings</span>
              </div>
 
-             {/* Google Sync Section */}
+             {/* Provider Selection */}
              <div className="bg-white p-3 rounded-lg border border-gray-100 mb-3 shadow-sm">
                  <div className="flex items-center gap-2 mb-2">
                      <Cloud size={16} className="text-blue-500"/>
-                     <h3 className="font-medium text-gray-800">Google Backup</h3>
+                     <h3 className="font-medium text-gray-800">Remote Backup</h3>
                  </div>
-                 <p className="text-xs text-gray-500 mb-3">Sync your data to a folder named "{FOLDER_NAME}" in your Google Drive.</p>
+                 
+                 <div className="mb-3">
+                     <label className="block text-xs text-gray-500 mb-1">Storage Provider</label>
+                     <select 
+                         value={selectedProviderId}
+                         onChange={(e) => onProviderChange(e.target.value)}
+                         disabled={isAuthenticated}
+                         className="w-full text-sm p-2 border rounded bg-slate-50 text-slate-700 disabled:opacity-50"
+                     >
+                         {providers.map(p => (
+                             <option key={p.id} value={p.id}>{p.name}</option>
+                         ))}
+                     </select>
+                 </div>
                  
                  {!isAuthenticated ? (
                      <div className="space-y-2">
-                         {!googleClientId && (
-                             <input 
-                                type="text" 
-                                placeholder="Enter Google Client ID" 
-                                className="w-full text-xs p-2 border rounded"
-                                onChange={(e) => {
-                                    setGoogleClientId(e.target.value);
-                                    localStorage.setItem('LUNA_GOOGLE_CLIENT_ID', e.target.value);
-                                }}
-                                value={googleClientId}
-                             />
-                         )}
                          <button onClick={onLogin} className="w-full bg-blue-500 text-white py-2 rounded text-xs font-bold hover:bg-blue-600">
-                             Connect Google Drive
+                             Connect {activeProvider.name}
                          </button>
                      </div>
                  ) : (
                      <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
-                         <span className="text-xs text-green-700 font-medium">Synced</span>
+                         <span className="text-xs text-green-700 font-medium">Synced via {activeProvider.name}</span>
                          <button onClick={onLogout} className="text-xs text-red-500 font-medium">Disconnect</button>
                      </div>
                  )}
@@ -96,7 +100,7 @@ export default function SettingsModal({
 
                  {showAdvancedConfig && (
                      <div className="bg-slate-50 p-3 rounded text-xs space-y-2 animate-in slide-in-from-top-1">
-                         <button onClick={resetClientId} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
+                         <button onClick={resetData} className="w-full text-red-400 hover:text-red-500 mt-2 text-[10px]">
                              Reset Application Data
                          </button>
                      </div>
