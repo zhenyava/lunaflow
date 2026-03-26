@@ -1,30 +1,8 @@
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { STORAGE_CURRENT_VERSION } from '../constants';
+import * as idb from './indexedDBService';
 import { migrations } from './migrationService';
 
-const DB_NAME = 'lunaflow';
-const DB_VERSION = 1;
-const STORE_NAME = 'appData';
-const STORE_KEY = 'events';
-
-/**
- * Opens (or creates) the IndexedDB database.
- */
-const openDB = (): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(STORE_NAME);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-/**
- * Central entry point for parsing and migrating raw data from any source.
- * It determines the current version of the data and runs it through the
- * migration pipeline sequentially until it reaches the STORAGE_CURRENT_VERSION.
- */
 export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord[], wasMigrated: boolean } => {
   if (!parsedData) return { records: [], wasMigrated: false };
 
@@ -70,25 +48,14 @@ export const prepareDataForStorage = (records: DailyRecord[]) => {
    return { ver: STORAGE_CURRENT_VERSION, records };
 };
 
-/**
- * Reads records from IndexedDB, running the migration pipeline if needed.
- */
 export const getStoredEvents = async (): Promise<DailyRecord[]> => {
   try {
-    const db = await openDB();
-    const data = await new Promise<unknown>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.get(STORE_KEY);
-      request.onsuccess = () => { db.close(); resolve(request.result); };
-      request.onerror = () => { db.close(); reject(request.error); };
-    });
+    const raw = await idb.readDailyRecords();
+    if (!raw) return [];
 
-    if (!data) return [];
-
-    const { records, wasMigrated } = parseAndMigrateData(data);
+    const { records, wasMigrated } = parseAndMigrateData(raw);
     if (wasMigrated) {
-      await saveStoredEvents(records);
+      await idb.writeDailyRecords(records);
     }
     return records;
   } catch (e) {
@@ -97,20 +64,9 @@ export const getStoredEvents = async (): Promise<DailyRecord[]> => {
   }
 };
 
-/**
- * Writes records to IndexedDB as a versioned blob.
- */
 export const saveStoredEvents = async (events: DailyRecord[]): Promise<void> => {
   try {
-    const db = await openDB();
-    const data = prepareDataForStorage(events);
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.put(data, STORE_KEY);
-      request.onsuccess = () => { db.close(); resolve(); };
-      request.onerror = () => { db.close(); reject(request.error); };
-    });
+    await idb.writeDailyRecords(events);
   } catch (e) {
     console.error('Failed to save to IndexedDB', e);
   }
