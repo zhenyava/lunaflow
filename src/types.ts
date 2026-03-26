@@ -72,7 +72,7 @@ export interface UserProfile {
 }
 
 export interface SyncState {
-  status: 'idle' | 'syncing' | 'success' | 'error';
+  status: 'idle' | 'syncing' | 'success' | 'error' | 'offline';
   lastSynced?: Date;
 }
 

@@ -75,6 +75,7 @@ src/
 - **`docs/STORAGE_ARCHITECTURE.md`**: Read for local storage logic, data envelope structure, and migrations.
 - **`docs/CALCULATION_LOGIC.md`**: Read for the mathematical logic behind cycle averages and future date predictions.
 - **`docs/LAYOUT_ARCHITECTURE.md`**: Read for CSS Grid/Flexbox structures, responsive breakpoints, UI component hierarchy, and mobile interaction flows.
+- **`docs/PWA_ARCHITECTURE.md`**: Read for service worker strategy, offline behavior, caching rules, cross-browser compatibility, and PWA-specific LLM development rules.
 
 ## Testing Guidelines
 

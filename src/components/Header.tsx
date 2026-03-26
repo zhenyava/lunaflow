@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
+import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { SyncState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
@@ -75,6 +75,9 @@ export default function Header({
     const navigate = useNavigate();
 
     const getSyncIcon = () => {
+        if (syncState.status === 'offline') {
+            return <WifiOff size={20} className="text-amber-500" />;
+        }
         if (syncState.status === 'syncing') {
             return <RefreshCw size={20} className="animate-spin text-yellow-500" />;
         }

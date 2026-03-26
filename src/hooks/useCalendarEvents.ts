@@ -1,19 +1,32 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import type { DailyRecord, EventType } from '../types';
-import { getLocalEvents, saveLocalEvents } from '../services/storageService';
+import { getStoredEvents, saveStoredEvents } from '../services/storageService';
 
 export function useCalendarEvents() {
   // Internal state holds ALL records, including those marked as isDeleted (tombstones)
-  const [records, setRecords] = useState<DailyRecord[]>(() => getLocalEvents());
+  const [records, setRecords] = useState<DailyRecord[]>([]);
   const [activeType, setActiveType] = useState<EventType>('period');
+  const [isLoaded, setIsLoaded] = useState(false);
+  const isLoadedRef = useRef(false);
 
-  // Save to Local Storage immediately when records change
+  // Load from IndexedDB on mount
   useEffect(() => {
-    saveLocalEvents(records);
+    getStoredEvents().then(events => {
+      setRecords(events);
+      isLoadedRef.current = true;
+      setIsLoaded(true);
+    });
+  }, []);
+
+  // Save to IndexedDB when records change (only after initial load)
+  useEffect(() => {
+    if (isLoadedRef.current) {
+      saveStoredEvents(records);
+    }
   }, [records]);
 
-  // Derived state: only records that are NOT deleted. 
+  // Derived state: only records that are NOT deleted.
   // This is what the UI and business logic (stats) will use.
   const activeEvents = useMemo(() => {
     return records.filter(r => !r.isDeleted);
@@ -47,7 +60,7 @@ export function useCalendarEvents() {
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
         const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
-        
+
         // If no data left for this day, mark as deleted
         if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
@@ -83,12 +96,12 @@ export function useCalendarEvents() {
 
       if (existingIdx >= 0) {
         const newRecord = { ...prev[existingIdx], ...updates, updatedAt: now };
-        
+
         // Check if there's any data left
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
         const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
-        
+
         if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
         } else {
@@ -106,11 +119,11 @@ export function useCalendarEvents() {
           isDeleted: false,
           ...updates
         };
-        
+
         const hasPeriod = !!newRecord.period;
         const hasOvulation = !!newRecord.ovulation;
         const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
-        
+
         if (!hasPeriod && !hasOvulation && !hasSymptoms) {
             newRecord.isDeleted = true;
         }
@@ -124,6 +137,7 @@ export function useCalendarEvents() {
     events: activeEvents,    // Clean events for UI
     allRecords: records,     // Raw records for Sync
     setEvents: setRecords,   // Updater for Sync
+    isLoaded, // Whether IndexedDB load is complete
     activeType,
     setActiveType,
     handleDayClick,

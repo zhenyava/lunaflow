@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DailyRecord, SyncState } from '../types';
-import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
+import { mergeEvents, saveStoredEvents, parseAndMigrateData } from '../services/storageService';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
@@ -24,7 +24,9 @@ interface UseRemoteSyncProps {
 export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
-  const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
+  const [syncState, setSyncState] = useState<SyncState>(() => ({
+    status: navigator.onLine ? 'idle' : 'offline'
+  }));
   const [isApiInitialized, setIsApiInitialized] = useState(false);
 
   // Handle any provider-specific callback logic (e.g., parsing OAuth hash tokens)
@@ -63,7 +65,7 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
         const isLocalDifferent = !eventsEqual(merged, localEvents);
         if (isLocalDifferent) {
              setEvents(merged);
-             saveLocalEvents(merged);
+             await saveStoredEvents(merged);
         }
 
         const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
@@ -120,10 +122,33 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
     }
   };
 
+  // Online/Offline Detection
+  const isOnlineRef = useRef(navigator.onLine);
+  useEffect(() => {
+    const handleOnline = () => {
+      isOnlineRef.current = true;
+      if (isAuthenticated && remoteFileId) {
+        performFullSync(remoteFileId);
+      } else {
+        setSyncState(prev => prev.status === 'offline' ? { status: 'idle' } : prev);
+      }
+    };
+    const handleOffline = () => {
+      isOnlineRef.current = false;
+      setSyncState({ status: 'offline' });
+    };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isAuthenticated, remoteFileId, performFullSync]);
+
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
-          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing') {
+          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing' && isOnlineRef.current) {
               performFullSync(remoteFileId);
           }
       };
@@ -133,10 +158,11 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !remoteFileId) return;
+    if (!isAuthenticated || !remoteFileId || !isOnlineRef.current) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
+        if (!isOnlineRef.current) return;
         setSyncState({ status: 'syncing' });
         try {
             await provider.uploadData(remoteFileId, events);
@@ -149,7 +175,7 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
                 setSyncState({ status: 'error' });
             }
         }
-    }, 2000); 
+    }, 2000);
 
     return () => clearTimeout(timeoutId);
   }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider]);

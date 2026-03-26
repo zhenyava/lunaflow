@@ -1,6 +1,24 @@
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
-import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { STORAGE_CURRENT_VERSION } from '../constants';
 import { migrations } from './migrationService';
+
+const DB_NAME = 'lunaflow';
+const DB_VERSION = 1;
+const STORE_NAME = 'appData';
+const STORE_KEY = 'events';
+
+/**
+ * Opens (or creates) the IndexedDB database.
+ */
+const openDB = (): Promise<IDBDatabase> =>
+  new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(STORE_NAME);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
 
 /**
  * Central entry point for parsing and migrating raw data from any source.
@@ -42,9 +60,9 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
 
   const wasMigrated = initialVer < currentVer;
 
-  return { 
-    records: records as DailyRecord[], 
-    wasMigrated 
+  return {
+    records: records as DailyRecord[],
+    wasMigrated
   };
 };
 
@@ -52,31 +70,51 @@ export const prepareDataForStorage = (records: DailyRecord[]) => {
    return { ver: STORAGE_CURRENT_VERSION, records };
 };
 
-export const saveLocalEvents = (events: DailyRecord[]) => {
+/**
+ * Reads records from IndexedDB, running the migration pipeline if needed.
+ */
+export const getStoredEvents = async (): Promise<DailyRecord[]> => {
   try {
-    const data = prepareDataForStorage(events);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    const db = await openDB();
+    const data = await new Promise<unknown>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.get(STORE_KEY);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+
+    if (!data) return [];
+
+    const { records, wasMigrated } = parseAndMigrateData(data);
+    if (wasMigrated) {
+      await saveStoredEvents(records);
+    }
+    return records;
   } catch (e) {
-    console.error('Failed to save to local storage', e);
+    console.error('Failed to load from IndexedDB', e);
+    return [];
   }
 };
 
-export const getLocalEvents = (): DailyRecord[] => {
+/**
+ * Writes records to IndexedDB as a versioned blob.
+ */
+export const saveStoredEvents = async (events: DailyRecord[]): Promise<void> => {
   try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!data) return [];
-
-    const parsed = JSON.parse(data);
-    const { records, wasMigrated } = parseAndMigrateData(parsed);
-
-    if (wasMigrated) {
-      saveLocalEvents(records);
-    }
-
-    return records;
+    const db = await openDB();
+    const data = prepareDataForStorage(events);
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const request = store.put(data, STORE_KEY);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
   } catch (e) {
-    console.error('Failed to load from local storage', e);
-    return [];
+    console.error('Failed to save to IndexedDB', e);
   }
 };
 

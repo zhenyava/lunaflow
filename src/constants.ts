@@ -1,5 +1,5 @@
 export const APP_DATA_FILENAME = 'lunaflow_data.json';
-export const LOCAL_STORAGE_KEY = 'lunaflow_events';
+
 export const LAUNCHED_KEY = 'lunaflow_has_launched';
 export const STORAGE_PROVIDER_KEY = 'lunaflow_storage_provider';
 export const STORAGE_CURRENT_VERSION = 2;
