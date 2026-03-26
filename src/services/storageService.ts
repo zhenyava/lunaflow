@@ -80,10 +80,9 @@ export const getStoredEvents = async (): Promise<DailyRecord[]> => {
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       const request = store.get(STORE_KEY);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { db.close(); resolve(request.result); };
+      request.onerror = () => { db.close(); reject(request.error); };
     });
-    db.close();
 
     if (!data) return [];
 
@@ -109,10 +108,9 @@ export const saveStoredEvents = async (events: DailyRecord[]): Promise<void> => 
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
       const request = store.put(data, STORE_KEY);
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => { db.close(); resolve(); };
+      request.onerror = () => { db.close(); reject(request.error); };
     });
-    db.close();
   } catch (e) {
     console.error('Failed to save to IndexedDB', e);
   }
