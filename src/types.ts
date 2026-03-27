@@ -71,12 +71,8 @@ export interface UserProfile {
   picture: string;
 }
 
-/**
- * UI-only feedback type consumed exclusively by Header to display the sync icon.
- * Not a logic state — sync decisions are driven by isOnline, isAuthenticated, remoteFileId.
- * TODO: consider moving closer to Header or renaming to reflect its UI-only purpose.
- */
-export interface SyncState {
+/** UI-only feedback type consumed by Header to display the sync icon. */
+export interface SyncIndicatorState {
   status: 'idle' | 'syncing' | 'success' | 'error' | 'offline';
   lastSynced?: Date;
 }

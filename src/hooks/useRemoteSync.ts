@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { DailyRecord, SyncState } from '../types';
+import type { DailyRecord, SyncIndicatorState } from '../types';
 import { mergeEvents, saveStoredEvents, parseAndMigrateData } from '../services/storageService';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
@@ -25,7 +25,7 @@ interface UseRemoteSyncProps {
 export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
-  const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
+  const [syncState, setSyncIndicatorState] = useState<SyncIndicatorState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
 
   // Handle any provider-specific callback logic (e.g., parsing OAuth hash tokens)
@@ -48,13 +48,13 @@ export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemo
       await provider.signOut();
       setIsAuthenticated(false);
       setRemoteFileId(null);
-      setSyncState({ status: 'idle' });
+      setSyncIndicatorState({ status: 'idle' });
   }, [provider]);
 
   // CORE SYNCHRONIZATION LOGIC
   const performFullSync = useCallback(async (fileId: string) => {
     if (!fileId) return;
-    setSyncState({ status: 'syncing' });
+    setSyncIndicatorState({ status: 'syncing' });
     try {
         const rawRemoteData = await provider.fetchData(fileId);
         const { records: remoteEvents } = parseAndMigrateData(rawRemoteData);
@@ -72,13 +72,13 @@ export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemo
              await provider.uploadData(fileId, merged);
         }
 
-        setSyncState({ status: 'success', lastSynced: new Date() });
+        setSyncIndicatorState({ status: 'success', lastSynced: new Date() });
     } catch (error: unknown) {
         const err = error as { message?: string; status?: number };
         if (err.message === 'Unauthorized' || err.status === 401) {
             handleLogout();
         } else {
-            setSyncState({ status: 'error' });
+            setSyncIndicatorState({ status: 'error' });
         }
     }
   }, [events, setEvents, handleLogout, provider]);
@@ -109,10 +109,10 @@ export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemo
 
   const handleLogin = async () => {
     try {
-      setSyncState({ status: 'syncing' });
+      setSyncIndicatorState({ status: 'syncing' });
       await provider.signIn();
     } catch (error: unknown) {
-      setSyncState({ status: 'error' });
+      setSyncIndicatorState({ status: 'error' });
       setIsAuthenticated(false);
       let errorMessage = "Login failed.";
       const err = error as { message?: string };
@@ -139,16 +139,16 @@ export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemo
 
     const timeoutId = setTimeout(async () => {
         if (!isOnline) return;
-        setSyncState({ status: 'syncing' });
+        setSyncIndicatorState({ status: 'syncing' });
         try {
             await provider.uploadData(remoteFileId, events);
-            setSyncState({ status: 'success', lastSynced: new Date() });
+            setSyncIndicatorState({ status: 'success', lastSynced: new Date() });
         } catch (error: unknown) {
              const err = error as { message?: string; status?: number };
              if (err.message === 'Unauthorized' || err.status === 401) {
                 handleLogout();
             } else {
-                setSyncState({ status: 'error' });
+                setSyncIndicatorState({ status: 'error' });
             }
         }
     }, 2000);

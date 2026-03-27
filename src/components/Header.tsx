@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
-import type { SyncState, EventType } from '../types';
+import type { SyncIndicatorState, EventType } from '../types';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
     avgCycleLength: number | null;
@@ -8,7 +8,7 @@ interface HeaderProps {
     activeType: EventType;
     setActiveType: (type: EventType) => void;
     isAuthenticated: boolean;
-    syncState: SyncState;
+    syncState: SyncIndicatorState;
     onSync: () => void;
     onLogin: () => void;
 
