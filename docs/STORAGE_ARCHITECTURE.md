@@ -12,10 +12,57 @@ This document outlines the approach used to store, version, and migrate data in 
      "records": [ { "date": "2024-01-01", ... } ]
    }
    ```
-3. **Transport Layer vs. Business Logic**: 
+3. **Transport Layer vs. Business Logic**:
    - **Storage Providers** (in `src/storageProviders/`): Abstract implementations of the `RemoteStorageProvider` interface. They handle the specifics of each vendor's API (e.g., `googleService.ts` for Google Drive).
-   - `storageService.ts` handles `localStorage`, merging, and is the entry point for migration (`parseAndMigrateData`).
+   - `storageService.ts` handles **IndexedDB** (local storage), merging, and is the entry point for migration (`parseAndMigrateData`).
    - `migrationService.ts` is a registry of transformation functions. It defines the `migrations` array.
+
+## Local Storage: IndexedDB
+
+LunaFlow uses **IndexedDB** (not localStorage) for local data persistence. IndexedDB provides:
+- Async API (non-blocking)
+- ~50MB+ storage limit vs localStorage's 5-10MB
+- Better eviction behavior in Safari PWA context
+
+### Database Layout
+
+- **Database**: `lunaflow` (version 1)
+- **Object Store**: `appData`
+- **Key**: `events`
+- **Value**: versioned blob `{ ver: 2, records: DailyRecord[] }`
+
+### API
+
+```typescript
+// Read records (async, runs migration pipeline)
+const records = await getStoredEvents();
+
+// Write records (async)
+await saveStoredEvents(records);
+```
+
+Both functions are in `src/services/storageService.ts` and are implemented using the native IndexedDB API — no external library.
+
+### Async Initialization in useCalendarEvents
+
+Since IndexedDB is async, `useCalendarEvents` starts with an empty array and loads records in a `useEffect`:
+
+```typescript
+const [records, setRecords] = useState<DailyRecord[]>([]);
+const isLoaded = useRef(false); // guards against saving empty state on mount
+
+useEffect(() => {
+  getStoredEvents().then(events => {
+    setRecords(events);
+    isLoaded.current = true;
+    setIsLoaded(true);
+  });
+}, []);
+```
+
+The `isLoaded` state (also returned from the hook) can be used to show a loading indicator while IndexedDB reads.
+
+**Note for developers**: If you clear the IndexedDB database (e.g., via Chrome DevTools > Application > IndexedDB), existing data will be lost. Re-sync from Google Drive if authenticated.
 
 ## Storage Abstraction
 

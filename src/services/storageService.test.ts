@@ -1,13 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { getLocalEvents, mergeEvents } from './storageService';
-import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { parseAndMigrateData, mergeEvents } from './storageService';
+import { STORAGE_CURRENT_VERSION } from '../constants';
 import { migrations } from './migrationService';
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
 
 describe('storageService', () => {
   beforeEach(() => {
-    localStorage.clear();
     vi.restoreAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
@@ -24,68 +23,43 @@ describe('storageService', () => {
     });
   });
 
-  describe('getLocalEvents & Migration', () => {
-    it('should migrate legacy events to DailyRecord and wrap in version 2', () => {
+  describe('parseAndMigrateData', () => {
+    it('should migrate legacy events to DailyRecord format', () => {
       const legacyEvents: LegacyCalendarEvent[] = [
         { date: '2024-01-01', type: 'period' },
         { date: '2024-01-02', type: 'period' },
         { date: '2024-01-14', type: 'ovulation' },
       ];
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(legacyEvents));
 
-      const result = getLocalEvents();
+      const { records, wasMigrated } = parseAndMigrateData(legacyEvents);
 
-      expect(result).toHaveLength(3);
-      expect(result[0]).toEqual(makePeriodRecord('2024-01-01'));
-      expect(result[1]).toEqual(makePeriodRecord('2024-01-02'));
-      expect(result[2]).toEqual(makeOvulationRecord('2024-01-14'));
-
-      const savedRaw = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEY) || '{}');
-      expect(savedRaw.ver).toBe(2);
-      expect(savedRaw.records).toEqual(result);
+      expect(wasMigrated).toBe(true);
+      expect(records).toHaveLength(3);
+      expect(records[0]).toEqual(makePeriodRecord('2024-01-01'));
+      expect(records[1]).toEqual(makePeriodRecord('2024-01-02'));
+      expect(records[2]).toEqual(makeOvulationRecord('2024-01-14'));
     });
 
-    it('should return records from versioned storage format', () => {
-      const mockRecords: DailyRecord[] = [
-        makePeriodRecord('2024-01-01')
-      ];
+    it('should return records from versioned storage format without migration', () => {
+      const mockRecords: DailyRecord[] = [makePeriodRecord('2024-01-01')];
       const versionedData = { ver: 2, records: mockRecords };
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(versionedData));
 
-      const result = getLocalEvents();
+      const { records, wasMigrated } = parseAndMigrateData(versionedData);
 
-      expect(result).toEqual(mockRecords);
+      expect(wasMigrated).toBe(false);
+      expect(records).toEqual(mockRecords);
     });
 
-    it('should return an empty array when localStorage returns null (no data)', () => {
-      const result = getLocalEvents();
-      expect(result).toEqual([]);
+    it('should return empty records for null/undefined input', () => {
+      const { records, wasMigrated } = parseAndMigrateData(null);
+      expect(records).toEqual([]);
+      expect(wasMigrated).toBe(false);
     });
 
-    it('should return an empty array and log error when JSON is invalid', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      localStorage.setItem(LOCAL_STORAGE_KEY, '{ invalid_json ]');
-      const result = getLocalEvents();
-      expect(result).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', expect.any(SyntaxError));
-      consoleErrorSpy.mockRestore();
-    });
-
-    it('should return an empty array and log error when localStorage.getItem throws an error', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-      const mockError = new Error('Access to localStorage denied');
-      const getItemSpy = vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => {
-        throw mockError;
-      });
-
-      const result = getLocalEvents();
-
-      expect(result).toEqual([]);
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load from local storage', mockError);
-      
-      getItemSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
+    it('should return empty records for invalid format', () => {
+      const { records, wasMigrated } = parseAndMigrateData({ foo: 'bar' });
+      expect(records).toEqual([]);
+      expect(wasMigrated).toBe(false);
     });
   });
 
@@ -102,7 +76,7 @@ describe('storageService', () => {
         ];
 
         const result = mergeEvents(local, remote);
-        
+
         expect(result).toHaveLength(2);
         expect(result[0]).toEqual({ date: '2024-01-01', updatedAt: now + 100, isDeleted: true });
         expect(result[1]).toEqual(makePeriodRecord('2024-01-02', now + 200));

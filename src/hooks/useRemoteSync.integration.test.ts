@@ -30,12 +30,12 @@ describe('useRemoteSync integration', () => {
   });
 
   it('should call handleCallback on mount', () => {
-    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider }));
+    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider, isOnline: true }));
     expect(provider.handleCallback).toHaveBeenCalled();
   });
 
   it('should initialize the provider on mount', () => {
-    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider }));
+    renderHook(() => useRemoteSync({ events: [], setEvents: vi.fn(), provider, isOnline: true }));
     expect(provider.initialize).toHaveBeenCalled();
   });
 

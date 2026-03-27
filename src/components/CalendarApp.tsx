@@ -32,6 +32,9 @@ function CalendarApp() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
+  // Online/Offline state (passed to useRemoteSync; effect registered after hook call below)
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
   // Provider State
   const [selectedProviderId, setSelectedProviderId] = useState(() => {
      return localStorage.getItem(STORAGE_PROVIDER_KEY) || 'google-drive';
@@ -59,11 +62,29 @@ function CalendarApp() {
     handleLogout,
     performFullSync,
     remoteFileId
-  } = useRemoteSync({ 
+  } = useRemoteSync({
       events: allRecords, // Pass raw records for sync
       setEvents,
-      provider
+      provider,
+      isOnline
   });
+
+  const displaySyncState = !isOnline ? { status: 'offline' as const } : syncState;
+
+  // Online/Offline Detection — registered here so performFullSync/remoteFileId are in scope
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      if (isAuthenticated && remoteFileId) performFullSync(remoteFileId);
+    };
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isAuthenticated, remoteFileId, performFullSync]);
 
   const handleProviderChange = useCallback(async (newId: string) => {
       if (isAuthenticated) {
@@ -133,7 +154,7 @@ function CalendarApp() {
         activeType={activeType}
         setActiveType={setActiveType}
         isAuthenticated={isAuthenticated}
-        syncState={syncState}
+        syncState={displaySyncState}
         onSync={() => remoteFileId && performFullSync(remoteFileId)}
         onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}

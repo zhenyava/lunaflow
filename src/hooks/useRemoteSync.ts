@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { DailyRecord, SyncState } from '../types';
-import { mergeEvents, saveLocalEvents, parseAndMigrateData } from '../services/storageService';
+import { mergeEvents, saveStoredEvents, parseAndMigrateData } from '../services/storageService';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
 export function eventsEqual(a: DailyRecord[], b: DailyRecord[]): boolean {
@@ -19,9 +19,10 @@ interface UseRemoteSyncProps {
   events: DailyRecord[];
   setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
   provider: RemoteStorageProvider;
+  isOnline: boolean;
 }
 
-export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProps) {
+export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
   const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
@@ -63,7 +64,7 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
         const isLocalDifferent = !eventsEqual(merged, localEvents);
         if (isLocalDifferent) {
              setEvents(merged);
-             saveLocalEvents(merged);
+             await saveStoredEvents(merged);
         }
 
         const isRemoteDifferent = !eventsEqual(merged, remoteEvents);
@@ -123,20 +124,21 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
-          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing') {
+          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing' && isOnline) {
               performFullSync(remoteFileId);
           }
       };
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, remoteFileId, syncState.status, performFullSync]);
+  }, [isAuthenticated, remoteFileId, syncState.status, performFullSync, isOnline]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !remoteFileId) return;
+    if (!isAuthenticated || !remoteFileId || !isOnline) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
+        if (!isOnline) return;
         setSyncState({ status: 'syncing' });
         try {
             await provider.uploadData(remoteFileId, events);
@@ -149,10 +151,10 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
                 setSyncState({ status: 'error' });
             }
         }
-    }, 2000); 
+    }, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider]);
+  }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider, isOnline]);
 
   return {
     isAuthenticated,

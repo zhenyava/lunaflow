@@ -1,12 +1,8 @@
 import type { DailyRecord, LegacyCalendarEvent } from '../types';
-import { LOCAL_STORAGE_KEY, STORAGE_CURRENT_VERSION } from '../constants';
+import { STORAGE_CURRENT_VERSION } from '../constants';
+import * as idb from './indexedDBService';
 import { migrations } from './migrationService';
 
-/**
- * Central entry point for parsing and migrating raw data from any source.
- * It determines the current version of the data and runs it through the
- * migration pipeline sequentially until it reaches the STORAGE_CURRENT_VERSION.
- */
 export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord[], wasMigrated: boolean } => {
   if (!parsedData) return { records: [], wasMigrated: false };
 
@@ -42,9 +38,9 @@ export const parseAndMigrateData = (parsedData: unknown): { records: DailyRecord
 
   const wasMigrated = initialVer < currentVer;
 
-  return { 
-    records: records as DailyRecord[], 
-    wasMigrated 
+  return {
+    records: records as DailyRecord[],
+    wasMigrated
   };
 };
 
@@ -52,31 +48,27 @@ export const prepareDataForStorage = (records: DailyRecord[]) => {
    return { ver: STORAGE_CURRENT_VERSION, records };
 };
 
-export const saveLocalEvents = (events: DailyRecord[]) => {
+export const getStoredEvents = async (): Promise<DailyRecord[]> => {
   try {
-    const data = prepareDataForStorage(events);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
+    const raw = await idb.readDailyRecords();
+    if (!raw) return [];
+
+    const { records, wasMigrated } = parseAndMigrateData(raw);
+    if (wasMigrated) {
+      await idb.writeDailyRecords(records);
+    }
+    return records;
   } catch (e) {
-    console.error('Failed to save to local storage', e);
+    console.error('Failed to load from IndexedDB', e);
+    return [];
   }
 };
 
-export const getLocalEvents = (): DailyRecord[] => {
+export const saveStoredEvents = async (events: DailyRecord[]): Promise<void> => {
   try {
-    const data = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!data) return [];
-
-    const parsed = JSON.parse(data);
-    const { records, wasMigrated } = parseAndMigrateData(parsed);
-
-    if (wasMigrated) {
-      saveLocalEvents(records);
-    }
-
-    return records;
+    await idb.writeDailyRecords(events);
   } catch (e) {
-    console.error('Failed to load from local storage', e);
-    return [];
+    console.error('Failed to save to IndexedDB', e);
   }
 };
 
