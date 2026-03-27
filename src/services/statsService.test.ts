@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { 
-  calculateAverageCycleLength, 
-  calculateAverageDuration, 
+import {
+  calculateAverageCycleLength,
+  calculateAverageDuration,
   predictFuturePeriods,
   predictFutureOvulations,
   calculateAverageOvulationCycleLength,
-  calculateAverageOvulationDuration
+  calculateAverageOvulationDuration,
+  calculateAverageOvulationOffset
 } from './statsService';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord, makeOvulationRecord } from '../types';
@@ -193,7 +194,7 @@ describe('statsService', () => {
   });
 
   describe('predictFutureOvulations', () => {
-    it('should handle multi-day ovulation events', () => {
+    it('should handle multi-day ovulation events (fallback: no period data)', () => {
       const events: DailyRecord[] = [
         makeOvulationRecord('2024-01-09'),
         makeOvulationRecord('2024-01-10'),
@@ -205,7 +206,7 @@ describe('statsService', () => {
 
       const prediction = predictFutureOvulations(events, avgCycle, limit);
 
-      // Avg cycle: 31 days (Jan 9 to Feb 9). Duration: 2 days.
+      // Avg ovulation cycle: 31 days (Jan 9 to Feb 9). Duration: 2 days.
       // Next: Feb 9 + 31 = Mar 11
       expect(prediction.has('2024-03-11')).toBe(true);
       expect(prediction.has('2024-03-12')).toBe(true);
@@ -226,7 +227,7 @@ describe('statsService', () => {
       expect(result.size).toBe(0);
     });
 
-    it('should predict future ovulation dates based on avg cycle length (fallback)', () => {
+    it('should predict future ovulation dates based on avg cycle length (fallback: no period data)', () => {
       const events: DailyRecord[] = [
         makeOvulationRecord('2024-01-14')
       ];
@@ -235,32 +236,132 @@ describe('statsService', () => {
 
       const prediction = predictFutureOvulations(events, avgCycle, limit);
 
-      // Expected ovulations:
-      // Jan 14 + 28 = Feb 11
-      // Feb 11 + 28 = Mar 10
+      // Expected ovulations (fallback: Jan 14 + 28 = Feb 11, Feb 11 + 28 = Mar 10):
       expect(prediction.has('2024-02-11')).toBe(true);
       expect(prediction.has('2024-03-10')).toBe(true);
       expect(prediction.has('2024-04-07')).toBe(false); // Out of bounds
       expect(prediction.size).toBe(2);
     });
 
-    it('should prioritize ovulation cycle average over period cycle average', () => {
+    it('should prioritize ovulation cycle average over period cycle average (fallback: no period data)', () => {
       const events: DailyRecord[] = [
         makeOvulationRecord('2024-01-01'),
         makeOvulationRecord('2024-01-31') // 30 day ovulation cycle
       ];
-      // Suppose we pass 28 from the period calculation, but ovulation has a 30-day average
       const periodAvgCycle = 28;
       const limit = new Date('2024-04-05');
 
       const prediction = predictFutureOvulations(events, periodAvgCycle, limit);
 
-      // Expected ovulations:
-      // Jan 31 + 30 = Mar 1 (Leap year 2024)
-      // Mar 1 + 30 = Mar 31
+      // Fallback uses avgOvulationCycle=30, not periodAvgCycle=28
+      // Jan 31 + 30 = Mar 1, Mar 1 + 30 = Mar 31
       expect(prediction.has('2024-03-01')).toBe(true);
       expect(prediction.has('2024-03-31')).toBe(true);
       expect(prediction.size).toBe(2);
+    });
+
+    it('should anchor ovulation predictions to period cycle when period data exists', () => {
+      const events: DailyRecord[] = [
+        // Period cluster 1: Jan 1 (start Jan 1)
+        makePeriodRecord('2024-01-01'),
+        makePeriodRecord('2024-01-02'),
+        makePeriodRecord('2024-01-03'),
+        // Period cluster 2: Feb 1 (cycle = 31 days)
+        makePeriodRecord('2024-02-01'),
+        makePeriodRecord('2024-02-02'),
+        makePeriodRecord('2024-02-03'),
+        // Single ovulation: Jan 15 (14 days after Jan 1 period start)
+        makeOvulationRecord('2024-01-15'),
+      ];
+      const avgCycle = 31;
+      const limit = new Date('2024-04-15');
+
+      const prediction = predictFutureOvulations(events, avgCycle, limit);
+
+      // avgOvulationOffset = 14 (Jan 15 - Jan 1)
+      // Last period = Feb 1, last known ovulation = Jan 15
+      // Feb 1 + 14 = Feb 15 > Jan 15 → first prediction
+      // Feb 1 + 31 = Mar 3, Mar 3 + 14 = Mar 17
+      // Mar 3 + 31 = Apr 3, Apr 3 + 14 = Apr 17 > limit
+      expect(prediction.has('2024-02-15')).toBe(true);
+      expect(prediction.has('2024-03-17')).toBe(true);
+      expect(prediction.has('2024-04-17')).toBe(false); // Out of bounds
+      expect(prediction.size).toBe(2);
+    });
+
+    it('should skip projected ovulations already covered by logged data', () => {
+      const events: DailyRecord[] = [
+        // Two period clusters: cycle = 31 days
+        makePeriodRecord('2024-01-01'),
+        makePeriodRecord('2024-02-01'),
+        // Ovulation logged in the second cycle: Feb 15 (14 days after Feb 1)
+        makeOvulationRecord('2024-02-15'),
+      ];
+      const avgCycle = 31;
+      const limit = new Date('2024-04-15');
+
+      const prediction = predictFutureOvulations(events, avgCycle, limit);
+
+      // avgOvulationOffset = 14 (Feb 15 - Feb 1)
+      // Last period = Feb 1, last known ovulation = Feb 15
+      // Feb 1 + 14 = Feb 15 ≤ Feb 15 (last known) → advance
+      // Feb 1 + 31 = Mar 3, Mar 3 + 14 = Mar 17 > Feb 15 → first prediction
+      // Mar 3 + 31 = Apr 3, Apr 3 + 14 = Apr 17 > limit
+      expect(prediction.has('2024-02-15')).toBe(false); // Already logged
+      expect(prediction.has('2024-03-17')).toBe(true);
+      expect(prediction.size).toBe(1);
+    });
+  });
+
+  describe('calculateAverageOvulationOffset', () => {
+    it('should return null if no period events', () => {
+      const events: DailyRecord[] = [makeOvulationRecord('2024-01-14')];
+      expect(calculateAverageOvulationOffset(events)).toBeNull();
+    });
+
+    it('should return null if no ovulation events', () => {
+      const events: DailyRecord[] = [makePeriodRecord('2024-01-01')];
+      expect(calculateAverageOvulationOffset(events)).toBeNull();
+    });
+
+    it('should calculate offset from a single period-ovulation pair', () => {
+      const events: DailyRecord[] = [
+        makePeriodRecord('2024-01-01'),
+        makePeriodRecord('2024-02-01'),
+        makeOvulationRecord('2024-01-14'), // 13 days after Jan 1
+      ];
+      expect(calculateAverageOvulationOffset(events)).toBe(13);
+    });
+
+    it('should average offsets across multiple cycles', () => {
+      const events: DailyRecord[] = [
+        makePeriodRecord('2024-01-01'),
+        makePeriodRecord('2024-02-01'),
+        makeOvulationRecord('2024-01-13'), // 12 days after Jan 1
+        makeOvulationRecord('2024-02-15'), // 14 days after Feb 1
+      ];
+      // (12 + 14) / 2 = 13
+      expect(calculateAverageOvulationOffset(events)).toBe(13);
+    });
+
+    it('should filter out offsets outside the valid range (5–40 days)', () => {
+      const events: DailyRecord[] = [
+        makePeriodRecord('2024-01-01'),
+        makePeriodRecord('2024-02-01'),
+        makePeriodRecord('2024-03-01'),
+        makeOvulationRecord('2024-01-03'), // 2 days after Jan 1 — too close, filtered
+        makeOvulationRecord('2024-02-15'), // 14 days after Feb 1 — valid
+        makeOvulationRecord('2024-04-15'), // 45 days after Mar 1 — too far, filtered
+      ];
+      expect(calculateAverageOvulationOffset(events)).toBe(14);
+    });
+
+    it('should return null if all offsets are out of range', () => {
+      const events: DailyRecord[] = [
+        makePeriodRecord('2024-01-01'),
+        makeOvulationRecord('2024-01-02'), // 1 day — too close
+      ];
+      expect(calculateAverageOvulationOffset(events)).toBeNull();
     });
   });
 

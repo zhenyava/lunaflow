@@ -66,21 +66,36 @@ Predictions project the user's cycle into the future based on their historical a
 
 ## 5. Future Ovulation Predictions
 
-Similarly to periods, future ovulation days are projected based on historical averages.
+Future ovulation days are projected using a **period-grounded approach** when period data is available, falling back to an ovulation-only approach otherwise.
+
+### Primary: Period-Grounded Approach
+
+Used when at least one period cluster and at least one ovulation cluster exist.
 
 **Algorithm:**
 1.  **Inputs:**
-    *   Last known marked ovulation date.
-    *   Average Ovulation Cycle Length (calculated by finding the average difference in days between the start dates of consecutive ovulation clusters, excluding outliers).
-    *   Average Ovulation Duration (calculated by finding the average number of days in each ovulation cluster).
-    *   Average Cycle Length (calculated above from period clusters) as a fallback.
-2.  **Determine Cycle Length:**
+    *   Period clusters (to anchor predictions to the menstrual cycle).
+    *   Average Cycle Length (from period clusters).
+    *   Average Ovulation Offset: the average number of days from a period cluster start to the nearest following ovulation cluster start within the same cycle. Offsets outside the range [5, 40] days are excluded as anomalies.
+    *   Average Ovulation Duration.
+2.  **Projection:**
+    *   Starting from the last known period cluster start, advance by `Avg Cycle Length` until the projected ovulation (`Period Start` + `Avg Ovulation Offset`) falls after the last logged ovulation.
+    *   `Next Ovulation Start` = `Current Period Start` + `Avg Ovulation Offset`.
+    *   `Next Ovulation Days` = `Next Ovulation Start` to (`Next Ovulation Start` + `Avg Ovulation Duration`).
+3.  **Loop:** Advance `Current Period Start` by `Avg Cycle Length` each iteration until the projection reaches the end date limit.
+
+**Why period-grounded?** Ovulation naturally follows each period within a cycle. Anchoring predictions to period starts ensures that if the period cycle shifts (e.g., a late period), ovulation predictions shift accordingly rather than drifting independently.
+
+### Fallback: Ovulation-Only Approach
+
+Used when no period data exists (only ovulation history is available).
+
+1.  **Determine Cycle Length:**
     *   If `Average Ovulation Cycle Length` is available (at least 2 marked ovulations), use it.
-    *   Otherwise, fallback to `Average Cycle Length` (from periods).
-3.  **Projection:**
+    *   Otherwise, fall back to `Average Cycle Length` (from periods).
+2.  **Projection:**
     *   `Next Ovulation Start Date` = `Last Ovulation Start Date` + `Cycle Length`.
-    *   `Next Ovulation Days` = `Next Ovulation Start Date` to (`Next Ovulation Start Date` + `Average Ovulation Duration`).
-4.  **Loop:** This process repeats, adding the `Cycle Length` to the previous projected ovulation date, until the projection reaches the requested end date (limit).
+    *   Repeat until the end date limit is reached.
 
 **Notes:**
 *   If no cycle length can be calculated from either ovulations or periods (is `null` or < 10), no predictions are generated.
