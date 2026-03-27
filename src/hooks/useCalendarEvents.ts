@@ -132,7 +132,6 @@ export function useCalendarEvents() {
     events: activeEvents,          // Clean events for UI
     allRecords: records ?? [],     // Raw records for Sync
     setEvents: setRecords as React.Dispatch<React.SetStateAction<DailyRecord[]>>,
-    isLoaded: records !== null,    // Whether IndexedDB load is complete
     activeType,
     setActiveType,
     handleDayClick,
