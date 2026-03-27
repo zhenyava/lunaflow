@@ -1,35 +1,30 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import type { DailyRecord, EventType } from '../types';
 import { getStoredEvents, saveStoredEvents } from '../services/storageService';
 
 export function useCalendarEvents() {
-  // Internal state holds ALL records, including those marked as isDeleted (tombstones)
-  const [records, setRecords] = useState<DailyRecord[]>([]);
+  // Internal state holds ALL records, including those marked as isDeleted (tombstones).
+  // null means "not yet loaded from IndexedDB" — distinct from an empty array (no events).
+  const [records, setRecords] = useState<DailyRecord[] | null>(null);
   const [activeType, setActiveType] = useState<EventType>('period');
-  const [isLoaded, setIsLoaded] = useState(false);
-  const isLoadedRef = useRef(false);
 
   // Load from IndexedDB on mount
   useEffect(() => {
-    getStoredEvents().then(events => {
-      setRecords(events);
-      isLoadedRef.current = true;
-      setIsLoaded(true);
-    });
+    getStoredEvents().then(setRecords);
   }, []);
 
-  // Save to IndexedDB when records change (only after initial load)
+  // Save to IndexedDB when records change. null guard prevents saving before the
+  // initial load completes — avoids overwriting IndexedDB with empty state on mount.
   useEffect(() => {
-    if (isLoadedRef.current) {
-      saveStoredEvents(records);
-    }
+    if (records === null) return;
+    saveStoredEvents(records);
   }, [records]);
 
   // Derived state: only records that are NOT deleted.
   // This is what the UI and business logic (stats) will use.
   const activeEvents = useMemo(() => {
-    return records.filter(r => !r.isDeleted);
+    return (records ?? []).filter(r => !r.isDeleted);
   }, [records]);
 
   const handleDayClick = useCallback((date: Date) => {
@@ -37,8 +32,8 @@ export function useCalendarEvents() {
     const now = Date.now();
 
     setRecords(prev => {
-      const existingIdx = prev.findIndex(e => e.date === dateStr);
-      const existing = existingIdx >= 0 ? prev[existingIdx] : null;
+      const existingIdx = prev!.findIndex(e => e.date === dateStr);
+      const existing = existingIdx >= 0 ? prev![existingIdx] : null;
 
       if (existing) {
         const newRecord: DailyRecord = { ...existing, updatedAt: now };
@@ -68,7 +63,7 @@ export function useCalendarEvents() {
             newRecord.isDeleted = false;
         }
 
-        const newRecords = [...prev];
+        const newRecords = [...prev!];
         newRecords[existingIdx] = newRecord;
         return newRecords;
       } else {
@@ -84,18 +79,18 @@ export function useCalendarEvents() {
           newRecord.ovulation = {};
         }
 
-        return [...prev, newRecord].sort((a, b) => a.date.localeCompare(b.date));
+        return [...prev!, newRecord].sort((a, b) => a.date.localeCompare(b.date));
       }
     });
   }, [activeType]);
 
   const updateRecord = useCallback((dateStr: string, updates: Partial<DailyRecord>) => {
     setRecords(prev => {
-      const existingIdx = prev.findIndex(e => e.date === dateStr);
+      const existingIdx = prev!.findIndex(e => e.date === dateStr);
       const now = Date.now();
 
       if (existingIdx >= 0) {
-        const newRecord = { ...prev[existingIdx], ...updates, updatedAt: now };
+        const newRecord = { ...prev![existingIdx], ...updates, updatedAt: now };
 
         // Check if there's any data left
         const hasPeriod = !!newRecord.period;
@@ -108,7 +103,7 @@ export function useCalendarEvents() {
             newRecord.isDeleted = false;
         }
 
-        const newRecords = [...prev];
+        const newRecords = [...prev!];
         newRecords[existingIdx] = newRecord;
         return newRecords;
       } else {
@@ -128,16 +123,16 @@ export function useCalendarEvents() {
             newRecord.isDeleted = true;
         }
 
-        return [...prev, newRecord].sort((a, b) => a.date.localeCompare(b.date));
+        return [...prev!, newRecord].sort((a, b) => a.date.localeCompare(b.date));
       }
     });
   }, []);
 
   return {
-    events: activeEvents,    // Clean events for UI
-    allRecords: records,     // Raw records for Sync
-    setEvents: setRecords,   // Updater for Sync
-    isLoaded, // Whether IndexedDB load is complete
+    events: activeEvents,          // Clean events for UI
+    allRecords: records ?? [],     // Raw records for Sync
+    setEvents: setRecords as React.Dispatch<React.SetStateAction<DailyRecord[]>>,
+    isLoaded: records !== null,    // Whether IndexedDB load is complete
     activeType,
     setActiveType,
     handleDayClick,
