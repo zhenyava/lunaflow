@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { DailyRecord, SyncState } from '../types';
 import { mergeEvents, saveStoredEvents, parseAndMigrateData } from '../services/storageService';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
@@ -19,14 +19,13 @@ interface UseRemoteSyncProps {
   events: DailyRecord[];
   setEvents: React.Dispatch<React.SetStateAction<DailyRecord[]>>;
   provider: RemoteStorageProvider;
+  isOnline: boolean;
 }
 
-export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProps) {
+export function useRemoteSync({ events, setEvents, provider, isOnline }: UseRemoteSyncProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [remoteFileId, setRemoteFileId] = useState<string | null>(null);
-  const [syncState, setSyncState] = useState<SyncState>(() => ({
-    status: navigator.onLine ? 'idle' : 'offline'
-  }));
+  const [syncState, setSyncState] = useState<SyncState>({ status: 'idle' });
   const [isApiInitialized, setIsApiInitialized] = useState(false);
 
   // Handle any provider-specific callback logic (e.g., parsing OAuth hash tokens)
@@ -122,47 +121,24 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
     }
   };
 
-  // Online/Offline Detection
-  const isOnlineRef = useRef(navigator.onLine);
-  useEffect(() => {
-    const handleOnline = () => {
-      isOnlineRef.current = true;
-      if (isAuthenticated && remoteFileId) {
-        performFullSync(remoteFileId);
-      } else {
-        setSyncState(prev => prev.status === 'offline' ? { status: 'idle' } : prev);
-      }
-    };
-    const handleOffline = () => {
-      isOnlineRef.current = false;
-      setSyncState({ status: 'offline' });
-    };
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [isAuthenticated, remoteFileId, performFullSync]);
-
   // Trigger Sync on Window Focus
   useEffect(() => {
       const onFocus = () => {
-          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing' && isOnlineRef.current) {
+          if (isAuthenticated && remoteFileId && syncState.status !== 'syncing' && isOnline) {
               performFullSync(remoteFileId);
           }
       };
       window.addEventListener('focus', onFocus);
       return () => window.removeEventListener('focus', onFocus);
-  }, [isAuthenticated, remoteFileId, syncState.status, performFullSync]);
+  }, [isAuthenticated, remoteFileId, syncState.status, performFullSync, isOnline]);
 
   // Debounced Auto-Save
   useEffect(() => {
-    if (!isAuthenticated || !remoteFileId || !isOnlineRef.current) return;
+    if (!isAuthenticated || !remoteFileId || !isOnline) return;
     if (syncState.status === 'success' && Date.now() - (syncState.lastSynced?.getTime() || 0) < 2000) return;
 
     const timeoutId = setTimeout(async () => {
-        if (!isOnlineRef.current) return;
+        if (!isOnline) return;
         setSyncState({ status: 'syncing' });
         try {
             await provider.uploadData(remoteFileId, events);
@@ -178,7 +154,7 @@ export function useRemoteSync({ events, setEvents, provider }: UseRemoteSyncProp
     }, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider]);
+  }, [events, isAuthenticated, remoteFileId, handleLogout, syncState.status, syncState.lastSynced, provider, isOnline]);
 
   return {
     isAuthenticated,

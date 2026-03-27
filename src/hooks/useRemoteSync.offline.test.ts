@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useRemoteSync } from './useRemoteSync';
 import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
@@ -17,7 +17,7 @@ class MockStorageProvider implements RemoteStorageProvider {
   handleCallback = vi.fn();
 }
 
-describe('useRemoteSync - offline detection', () => {
+describe('useRemoteSync - online reconnect', () => {
   let provider: MockStorageProvider;
 
   beforeEach(() => {
@@ -28,40 +28,10 @@ describe('useRemoteSync - offline detection', () => {
     vi.restoreAllMocks();
   });
 
-  it('starts with idle status when online', () => {
+  it('starts with idle status', () => {
     const { result, unmount } = renderHook(() =>
-      useRemoteSync({ events: [], setEvents: vi.fn(), provider })
+      useRemoteSync({ events: [], setEvents: vi.fn(), provider, isOnline: true })
     );
-    expect(result.current.syncState.status).toBe('idle');
-    unmount();
-  });
-
-  it('sets syncState to offline when offline event fires', () => {
-    const { result, unmount } = renderHook(() =>
-      useRemoteSync({ events: [], setEvents: vi.fn(), provider })
-    );
-
-    act(() => {
-      window.dispatchEvent(new Event('offline'));
-    });
-
-    expect(result.current.syncState.status).toBe('offline');
-    unmount();
-  });
-
-  it('clears offline status when online event fires after being offline', () => {
-    const { result, unmount } = renderHook(() =>
-      useRemoteSync({ events: [], setEvents: vi.fn(), provider })
-    );
-
-    act(() => {
-      window.dispatchEvent(new Event('offline'));
-    });
-    expect(result.current.syncState.status).toBe('offline');
-
-    act(() => {
-      window.dispatchEvent(new Event('online'));
-    });
     expect(result.current.syncState.status).toBe('idle');
     unmount();
   });
