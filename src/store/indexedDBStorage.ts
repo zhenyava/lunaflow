@@ -1,4 +1,4 @@
-import type { DailyRecord } from '../types';
+import type { DailyRecord } from './DailyRecord';
 
 const DB_NAME = 'lunaflow';
 const STORE_NAME = 'appData';

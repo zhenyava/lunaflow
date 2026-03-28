@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { makePeriodRecord } from '../types';
-import type { DailyRecord } from '../types';
+import { makePeriodRecord } from './DailyRecord';
+import type { DailyRecord } from './DailyRecord';
 import { STORAGE_CURRENT_VERSION } from '../constants';
 
 vi.mock('./indexedDBStorage', () => ({

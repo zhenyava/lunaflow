@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
-import type { DailyRecord } from '../types';
-import { makePeriodRecord } from '../types';
+import type { DailyRecord } from '../store/DailyRecord';
+import { makePeriodRecord } from '../store/DailyRecord';
 
 // Mock recordsStore singleton
 vi.mock('../store/RecordsStore', () => {

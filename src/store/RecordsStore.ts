@@ -1,4 +1,4 @@
-import type { DailyRecord } from '../types';
+import type { DailyRecord } from './DailyRecord';
 import { STORAGE_CURRENT_VERSION } from '../constants';
 import * as idb from './indexedDBStorage';
 import { migrations } from './migrationData';

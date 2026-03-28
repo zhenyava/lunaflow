@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import type { EventType, DailyRecord } from '../types';
+import type { EventType, DailyRecord } from '../store/DailyRecord';
 import type { RecordsStore } from '../store/RecordsStore';
 
 export function useCalendarEvents(store: RecordsStore) {

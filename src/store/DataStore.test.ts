@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataStore } from './DataStore';
-import type { DailyRecord } from '../types';
-import { makePeriodRecord } from '../types';
+import type { DailyRecord } from './DailyRecord';
+import { makePeriodRecord } from './DailyRecord';
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 
 // Minimal concrete subclass for testing DataStore behavior

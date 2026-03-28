@@ -8,8 +8,8 @@ import {
   calculateAverageOvulationDuration,
   calculateAverageOvulationOffset
 } from './statsService';
-import type { DailyRecord } from '../types';
-import { makePeriodRecord, makeOvulationRecord } from '../types';
+import type { DailyRecord } from '../store/DailyRecord';
+import { makePeriodRecord, makeOvulationRecord } from '../store/DailyRecord';
 
 describe('statsService', () => {
   const createEvent = makePeriodRecord;

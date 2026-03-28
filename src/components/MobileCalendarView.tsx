@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import type { DailyRecord } from '../types';
+import type { DailyRecord } from '../store/DailyRecord';
 import CalendarMonth from './CalendarMonth';
 
 interface MobileCalendarViewProps {
