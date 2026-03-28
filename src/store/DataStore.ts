@@ -49,6 +49,7 @@ export abstract class DataStore<T> {
 
   async save(data: T): Promise<void> {
     this.data = data;
+    this.notify();
     await this.saveLocal(data);
     this.scheduleUpload(data);
   }
