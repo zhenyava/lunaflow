@@ -93,4 +93,3 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
   }
 }
 
-export const recordsStore = new RecordsStore();

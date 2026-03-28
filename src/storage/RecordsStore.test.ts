@@ -20,11 +20,11 @@ const { providerMock } = vi.hoisted(() => ({
   }
 }));
 
-import { recordsStore } from './RecordsStore';
+import { RecordsStore } from './RecordsStore';
 import * as idb from './indexedDBStorage';
 
 describe('migrateData', () => {
-  const rs = recordsStore as unknown as {
+  const rs = new RecordsStore() as unknown as {
     migrateData(d: unknown): { records: DailyRecord[], wasMigrated: boolean }
   };
 
@@ -55,9 +55,11 @@ describe('migrateData', () => {
 });
 
 describe('RecordsStore', () => {
+  let recordsStore: RecordsStore;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    (recordsStore as unknown as { data: DailyRecord[] | null }).data = null;
+    recordsStore = new RecordsStore();
     (recordsStore as unknown as { _cloudStorageProvider: unknown })._cloudStorageProvider = providerMock;
   });
 

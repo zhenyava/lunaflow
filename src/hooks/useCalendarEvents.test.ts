@@ -4,35 +4,29 @@ import { useCalendarEvents } from './useCalendarEvents';
 import type { DailyRecord } from '../storage/DailyRecord';
 import { makePeriodRecord } from '../storage/DailyRecord';
 
-// Mock recordsStore singleton
-vi.mock('../storage/RecordsStore', () => {
-  const listeners = new Set<() => void>();
-  const store = {
-    data: null as DailyRecord[] | null,
-    get events() {
-      return (this.data ?? []).filter((r: DailyRecord) => !r.isDeleted);
-    },
-    get allRecords() {
-      return this.data;
-    },
-    cloudState: 'unsynced' as const,
-    fileId: null as string | null,
-    save: vi.fn(async function(this: typeof store, records: DailyRecord[]) {
-      this.data = records;
-      listeners.forEach(fn => fn());
-    }),
-    subscribe: vi.fn((fn: () => void) => {
-      listeners.add(fn);
-      return () => listeners.delete(fn);
-    }),
-    init: vi.fn(),
-    destroy: vi.fn(),
-    forceSync: vi.fn(async () => {}),
-  };
-  return { recordsStore: store };
-});
-
-import { recordsStore } from '../storage/RecordsStore';
+const listeners = new Set<() => void>();
+const recordsStore = {
+  data: null as DailyRecord[] | null,
+  get events() {
+    return (this.data ?? []).filter((r: DailyRecord) => !r.isDeleted);
+  },
+  get allRecords() {
+    return this.data;
+  },
+  cloudState: 'unsynced' as const,
+  fileId: null as string | null,
+  save: vi.fn(async function(records: DailyRecord[]) {
+    recordsStore.data = records;
+    listeners.forEach(fn => fn());
+  }),
+  subscribe: vi.fn((fn: () => void) => {
+    listeners.add(fn);
+    return () => listeners.delete(fn);
+  }),
+  init: vi.fn(),
+  destroy: vi.fn(),
+  forceSync: vi.fn(async () => {}),
+};
 
 describe('useCalendarEvents', () => {
   beforeEach(() => {

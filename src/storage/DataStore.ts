@@ -48,7 +48,7 @@ export abstract class DataStore<T> {
 
   private setData(data: T): void {
     this.data = data;
-    this.onDataChanged?.(data);
+    this.onDataChanged(data);
     this._dataListeners.forEach(fn => fn());
   }
 
@@ -58,7 +58,7 @@ export abstract class DataStore<T> {
   }
 
   // Optional hook for subclasses to react to data changes (e.g. update derived caches)
-  protected onDataChanged?(data: T): void;
+  protected onDataChanged(_data: T): void {}
 
   // --- Public API ---
 
