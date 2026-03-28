@@ -78,11 +78,11 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
 
   // Derived views for UI
 
-  get events(): DailyRecord[] {
+  get events(): readonly DailyRecord[] {
     return (this.data ?? []).filter(r => !r.isDeleted);
   }
 
-  get allRecords(): DailyRecord[] {
+  get allRecords(): readonly DailyRecord[] {
     return this.data ?? [];
   }
 
