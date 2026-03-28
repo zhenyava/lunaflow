@@ -2,7 +2,6 @@ import { useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { EventType } from '../types';
-import type { ProviderDescriptor } from '../storageProviders/StorageProviderRegistry';
 import type { RecordsStore } from '../store/RecordsStore';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
@@ -20,7 +19,6 @@ interface HeaderProps {
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
     selectedProviderId: string;
-    allProviders: ProviderDescriptor[];
     onProviderChange: (id: string) => void;
     onLogout: () => void;
 
@@ -70,7 +68,6 @@ export default function Header({
     isSettingsOpen,
     setSettingsOpen,
     selectedProviderId,
-    allProviders,
     onProviderChange,
     onLogout,
     isEditMode,
@@ -207,7 +204,6 @@ export default function Header({
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}
                 selectedProviderId={selectedProviderId}
-                allProviders={allProviders}
                 onProviderChange={onProviderChange}
                 onLogin={onLogin}
                 onLogout={onLogout}

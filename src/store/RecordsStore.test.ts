@@ -20,14 +20,6 @@ const { providerMock } = vi.hoisted(() => ({
   }
 }));
 
-vi.mock('../storageProviders/StorageProviderRegistry', () => ({
-  storageProviderRegistry: {
-    getActiveProvider: vi.fn(() => providerMock),
-    notify: vi.fn(),
-    subscribe: vi.fn(() => () => { }),
-  },
-}));
-
 import { recordsStore } from './RecordsStore';
 import * as idb from './indexedDBStorage';
 

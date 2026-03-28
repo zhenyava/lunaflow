@@ -10,8 +10,8 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useCycleStats } from '../hooks/useCycleStats';
 import { GoogleAuthProvider } from '../auth/GoogleAuthProvider';
 import { GoogleDriveProvider } from '../storageProviders/GoogleDriveProvider';
-import { StorageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
 import { RecordsStore } from '../store/RecordsStore';
+import { CLOUD_PROVIDER_KEY } from '../constants';
 
 // Generate a range of months for the Mobile "Infinite" list
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
@@ -20,12 +20,11 @@ const INITIAL_END_DATE = addMonths(startOfMonth(new Date()), 12);
 function CalendarApp() {
   // Singleton instances — created once per mount
   const authProvider = useMemo(() => new GoogleAuthProvider(), []);
-  const registry = useMemo(() => {
-    const r = new StorageProviderRegistry();
-    r.registerProvider({ id: 'google-drive', name: 'Google Drive' });
-    return r;
-  }, []);
   const recordsStore = useMemo(() => new RecordsStore(), []);
+
+  const [selectedProviderId, setSelectedProviderId] = useState(
+    () => localStorage.getItem(CLOUD_PROVIDER_KEY) ?? 'google-drive'
+  );
 
   // React bridge: re-render when data changes
   const [, rerender] = useReducer((x: number) => x + 1, 0);
@@ -47,15 +46,13 @@ function CalendarApp() {
 
     const unsubStore = recordsStore.subscribeDataChanged(rerender);
     const unsubAuth = authProvider.onAuthStateChange(() => rerender());
-    const unsubRegistry = registry.subscribe(rerender);
 
     return () => {
       recordsStore.destroy();
       unsubStore();
       unsubAuth();
-      unsubRegistry();
     };
-  }, [authProvider, recordsStore, registry]);
+  }, [authProvider, recordsStore]);
 
   // Auth actions
   const handleLogin = useCallback(async () => {
@@ -74,12 +71,11 @@ function CalendarApp() {
   const handleProviderChange = useCallback((id: string) => {
     recordsStore.disconnectRemote();
     if (authProvider.isAuthenticated()) authProvider.signOut();
-    registry.setActiveProvider(id);
-  }, [authProvider, recordsStore, registry]);
+    localStorage.setItem(CLOUD_PROVIDER_KEY, id);
+    setSelectedProviderId(id);
+  }, [authProvider, recordsStore]);
 
   const isAuthenticated = authProvider.isAuthenticated();
-  const selectedProviderId = registry.activeProviderId;
-  const allProviders = registry.getAllProviders();
 
   // Domain mutations hook
   const { events, activeType, setActiveType, handleDayClick, updateRecord } = useCalendarEvents(recordsStore);
@@ -182,7 +178,6 @@ function CalendarApp() {
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
         selectedProviderId={selectedProviderId}
-        allProviders={allProviders}
         onProviderChange={handleProviderChange}
         onLogout={handleLogout}
         isEditMode={isEditMode}

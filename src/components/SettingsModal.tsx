@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import type { ProviderDescriptor } from '../storageProviders/StorageProviderRegistry';
+import { AVAILABLE_CLOUD_PROVIDERS } from '../constants';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isAuthenticated: boolean;
     selectedProviderId: string;
-    allProviders: ProviderDescriptor[];
     onProviderChange: (id: string) => void;
     onLogin: () => void;
     onLogout: () => void;
@@ -17,7 +16,6 @@ export default function SettingsModal({
     isOpen,
     isAuthenticated,
     selectedProviderId,
-    allProviders,
     onProviderChange,
     onLogin,
     onLogout
@@ -33,7 +31,7 @@ export default function SettingsModal({
 
     if (!isOpen) return null;
 
-    const providers = allProviders;
+    const providers = AVAILABLE_CLOUD_PROVIDERS;
     const activeProvider = providers.find(p => p.id === selectedProviderId) ?? { id: selectedProviderId, name: selectedProviderId };
 
     return (
