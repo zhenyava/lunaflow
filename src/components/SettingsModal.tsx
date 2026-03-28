@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { AVAILABLE_CLOUD_PROVIDERS } from '../constants';
+import { AVAILABLE_CLOUD_PROVIDERS, CLOUD_STORAGE_FOLDER_NAME, CLOUD_STORAGE_FILENAME } from '../constants';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -68,10 +68,13 @@ export default function SettingsModal({
                          </button>
                      </div>
                  ) : (
-                     <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
-                         <span className="text-xs text-green-700 font-medium">Synced via {activeProvider.name}</span>
-                         <button onClick={onLogout} className="text-xs text-red-500 font-medium">Disconnect</button>
-                     </div>
+                     <>
+                         <div className="flex justify-between items-center bg-green-50 p-2 rounded border border-green-100">
+                             <span className="text-xs text-green-700 font-medium">Synced via {activeProvider.name}</span>
+                             <button onClick={onLogout} className="text-xs text-red-500 font-medium">Disconnect</button>
+                         </div>
+                         <p className="text-xs text-gray-400 mt-2">Data stored in: {CLOUD_STORAGE_FOLDER_NAME}/{CLOUD_STORAGE_FILENAME}</p>
+                     </>
                  )}
              </div>
 
