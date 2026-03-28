@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { addMonths, endOfYear, max, startOfMonth } from 'date-fns';
-import type { DailyRecord } from '../store/DailyRecord';
+import type { DailyRecord } from '../storage/DailyRecord';
 import { 
     calculateAverageCycleLength, 
     calculateAverageDuration, 

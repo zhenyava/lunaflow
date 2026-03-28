@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { format } from 'date-fns';
-import type { EventType, DailyRecord } from '../store/DailyRecord';
-import type { RecordsStore } from '../store/RecordsStore';
+import type { EventType, DailyRecord } from '../storage/DailyRecord';
+import type { RecordsStore } from '../storage/RecordsStore';
 
 export function useCalendarEvents(store: RecordsStore) {
   const [activeType, setActiveType] = useState<EventType>('period');

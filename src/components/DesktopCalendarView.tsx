@@ -1,4 +1,4 @@
-import type { DailyRecord } from '../store/DailyRecord';
+import type { DailyRecord } from '../storage/DailyRecord';
 import CalendarMonth from './CalendarMonth';
 
 interface DesktopCalendarViewProps {

@@ -1,5 +1,5 @@
 import { differenceInDays, parseISO, addDays, format, isAfter } from 'date-fns';
-import type { DailyRecord, EventType } from '../store/DailyRecord';
+import type { DailyRecord, EventType } from '../storage/DailyRecord';
 
 /**
  * Helper to group continuous events of a specific type into clusters (cycles)

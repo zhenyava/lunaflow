@@ -1,8 +1,8 @@
 import { useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
-import type { EventType } from '../store/DailyRecord';
-import type { RecordsStore } from '../store/RecordsStore';
+import type { EventType } from '../storage/DailyRecord';
+import type { RecordsStore } from '../storage/RecordsStore';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
     avgCycleLength: number | null;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import symptomsData from './symptoms.json';
-import type { SymptomCategory, SymptomOption } from '../store/DailyRecord';
+import type { SymptomCategory, SymptomOption } from '../storage/DailyRecord';
 
 describe('Symptoms JSON Configuration', () => {
   it('should have a valid structure', () => {

@@ -10,7 +10,7 @@ import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useCycleStats } from '../hooks/useCycleStats';
 import { GoogleAuthProvider } from '../auth/GoogleAuthProvider';
 import { GoogleDriveProvider } from '../cloudStorageProviders/GoogleDriveProvider';
-import { RecordsStore } from '../store/RecordsStore';
+import { RecordsStore } from '../storage/RecordsStore';
 import { CLOUD_PROVIDER_KEY } from '../constants';
 
 // Generate a range of months for the Mobile "Infinite" list

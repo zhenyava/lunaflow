@@ -2,7 +2,7 @@ import React from 'react';
 import { DayPicker } from 'react-day-picker';
 import { parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
-import type { DailyRecord } from '../store/DailyRecord';
+import type { DailyRecord } from '../storage/DailyRecord';
 
 interface CalendarMonthProps {
   month: Date;

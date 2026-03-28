@@ -1,5 +1,5 @@
 import { Droplet, Sparkles, Check } from 'lucide-react';
-import type { EventType } from '../store/DailyRecord';
+import type { EventType } from '../storage/DailyRecord';
 
 interface MobileControlsProps {
     activeType: EventType;

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
-import type { DailyRecord } from '../store/DailyRecord';
-import { makePeriodRecord } from '../store/DailyRecord';
+import type { DailyRecord } from '../storage/DailyRecord';
+import { makePeriodRecord } from '../storage/DailyRecord';
 
 // Mock recordsStore singleton
-vi.mock('../store/RecordsStore', () => {
+vi.mock('../storage/RecordsStore', () => {
   const listeners = new Set<() => void>();
   const store = {
     data: null as DailyRecord[] | null,
@@ -32,7 +32,7 @@ vi.mock('../store/RecordsStore', () => {
   return { recordsStore: store };
 });
 
-import { recordsStore } from '../store/RecordsStore';
+import { recordsStore } from '../storage/RecordsStore';
 
 describe('useCalendarEvents', () => {
   beforeEach(() => {
