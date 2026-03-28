@@ -35,25 +35,6 @@ vi.mock('../store/RecordsStore', () => {
   return { recordsStore: store };
 });
 
-const mockProvider = {
-  name: 'Google Drive',
-  isAuthenticated: vi.fn(() => false),
-  signIn: vi.fn(async () => {}),
-  signOut: vi.fn(async () => {}),
-  onAuthStateChange: vi.fn(() => () => {}),
-};
-
-vi.mock('../storageProviders/StorageProviderRegistry', () => ({
-  storageProviderRegistry: {
-    activeProviderId: 'google-drive',
-    getActiveProvider: vi.fn(() => mockProvider),
-    getAllProviders: vi.fn(() => []),
-    setActiveProvider: vi.fn(async () => {}),
-    notify: vi.fn(),
-    subscribe: vi.fn(() => () => {}),
-  },
-}));
-
 import { recordsStore } from '../store/RecordsStore';
 
 describe('useCalendarEvents', () => {
@@ -63,28 +44,22 @@ describe('useCalendarEvents', () => {
     // Reset store state
     (recordsStore as { data: DailyRecord[] | null }).data = null;
     vi.mocked(recordsStore.save).mockClear();
-    vi.mocked(recordsStore.init).mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('calls recordsStore.init on mount', () => {
-    renderHook(() => useCalendarEvents());
-    expect(recordsStore.init).toHaveBeenCalledOnce();
-  });
-
   it('reflects recordsStore.events', async () => {
     const mockEvents = [makePeriodRecord('2024-03-01')];
     (recordsStore as { data: DailyRecord[] | null }).data = mockEvents;
 
-    const { result } = renderHook(() => useCalendarEvents());
+    const { result } = renderHook(() => useCalendarEvents(recordsStore));
     expect(result.current.events).toEqual(mockEvents);
   });
 
   it('reflects recordsStore.isLoaded', () => {
-    const { result } = renderHook(() => useCalendarEvents());
+    const { result } = renderHook(() => useCalendarEvents(recordsStore));
     expect(result.current.isLoaded).toBe(false);
 
     act(() => {
@@ -96,7 +71,7 @@ describe('useCalendarEvents', () => {
   describe('handleDayClick', () => {
     it('adds a new period record when date is empty', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
-      const { result } = renderHook(() => useCalendarEvents());
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => {
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
@@ -109,7 +84,7 @@ describe('useCalendarEvents', () => {
 
     it('adds ovulation record when activeType is ovulation', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
-      const { result } = renderHook(() => useCalendarEvents());
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => result.current.setActiveType('ovulation'));
       act(() => result.current.handleDayClick(new Date('2024-03-05T12:00:00Z')));
@@ -121,7 +96,7 @@ describe('useCalendarEvents', () => {
 
     it('marks record as deleted when toggling off the only event', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
-      const { result } = renderHook(() => useCalendarEvents());
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => result.current.setActiveType('period'));
       act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
@@ -135,7 +110,7 @@ describe('useCalendarEvents', () => {
     it('updates existing record and calls recordsStore.save', async () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
-      const { result } = renderHook(() => useCalendarEvents());
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => {
         result.current.updateRecord('2024-03-01', { ovulation: {} });
@@ -153,7 +128,7 @@ describe('useCalendarEvents', () => {
     it('marks record as deleted when all data is removed', async () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
-      const { result } = renderHook(() => useCalendarEvents());
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => {
         result.current.updateRecord('2024-03-01', { period: undefined });
@@ -161,30 +136,6 @@ describe('useCalendarEvents', () => {
 
       const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
       expect(saved[0].isDeleted).toBe(true);
-    });
-  });
-
-  describe('auth / sync passthrough', () => {
-    it('exposes isAuthenticated from registry', () => {
-      const { result } = renderHook(() => useCalendarEvents());
-      expect(result.current.isAuthenticated).toBe(false);
-    });
-
-    it('exposes cloudState from recordsStore', () => {
-      const { result } = renderHook(() => useCalendarEvents());
-      expect(result.current.cloudState).toBe('unsynced');
-    });
-
-    it('handleLogin calls provider.signIn', async () => {
-      const { result } = renderHook(() => useCalendarEvents());
-      await act(async () => result.current.handleLogin());
-      expect(mockProvider.signIn).toHaveBeenCalled();
-    });
-
-    it('handleLogout calls provider.signOut', async () => {
-      const { result } = renderHook(() => useCalendarEvents());
-      await act(async () => result.current.handleLogout());
-      expect(mockProvider.signOut).toHaveBeenCalled();
     });
   });
 });

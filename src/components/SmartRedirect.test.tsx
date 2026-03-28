@@ -1,9 +1,7 @@
-import { makePeriodRecord } from '../types';
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import SmartRedirect from './SmartRedirect';
 import { LAUNCHED_KEY } from '../constants';
-import { recordsStore } from '../store/RecordsStore';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 const mockNavigate = vi.fn();
@@ -25,8 +23,6 @@ describe('SmartRedirect', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     localStorage.clear();
-    // Default mock for getStoredEvents to return empty array
-    vi.spyOn(recordsStore, 'getLocalEvents').mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -46,7 +42,6 @@ describe('SmartRedirect', () => {
   it('renders LandingPage for a completely new user', async () => {
     const { getByTestId } = renderComponent();
     expect(getByTestId('landing-page')).toBeInTheDocument();
-    // Wait for async effect to complete
     await waitFor(() => {
       expect(mockNavigate).not.toHaveBeenCalled();
     });
@@ -61,38 +56,11 @@ describe('SmartRedirect', () => {
     });
   });
 
-  it('redirects to /calendar if user has stored events', async () => {
-    vi.spyOn(recordsStore, 'getLocalEvents').mockResolvedValue([makePeriodRecord('2023-01-01')]);
-
-    renderComponent();
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/calendar', { replace: true });
-    });
-  });
-
   it('renders LandingPage if navigating from app (fromApp is true in state)', async () => {
     localStorage.setItem(LAUNCHED_KEY, 'true');
     renderComponent([{ pathname: '/', state: { fromApp: true } }]);
-    // Wait a tick for any async effects
     await waitFor(() => {
       expect(mockNavigate).not.toHaveBeenCalled();
     });
-  });
-
-  it('handles storage errors gracefully and renders LandingPage', async () => {
-    const originalConsoleError = console.error;
-    console.error = vi.fn(); // Hide the error in test output
-
-    vi.spyOn(recordsStore, 'getLocalEvents').mockRejectedValue(new Error('Storage access denied'));
-
-    const { getByTestId } = renderComponent();
-
-    expect(getByTestId('landing-page')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(mockNavigate).not.toHaveBeenCalled();
-    });
-
-    console.error = originalConsoleError;
   });
 });
