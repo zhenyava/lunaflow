@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Cloud, MessageSquare, Settings } from 'lucide-react';
-import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
+import type { ProviderDescriptor } from '../storageProviders/StorageProviderRegistry';
 
 interface SettingsModalProps {
     isOpen: boolean;
     onClose: () => void;
     isAuthenticated: boolean;
     selectedProviderId: string;
+    allProviders: ProviderDescriptor[];
     onProviderChange: (id: string) => void;
     onLogin: () => void;
     onLogout: () => void;
@@ -16,6 +17,7 @@ export default function SettingsModal({
     isOpen,
     isAuthenticated,
     selectedProviderId,
+    allProviders,
     onProviderChange,
     onLogin,
     onLogout
@@ -31,8 +33,8 @@ export default function SettingsModal({
 
     if (!isOpen) return null;
 
-    const providers = storageProviderRegistry.getAllProviders();
-    const activeProvider = storageProviderRegistry.getProvider(selectedProviderId);
+    const providers = allProviders;
+    const activeProvider = providers.find(p => p.id === selectedProviderId) ?? { id: selectedProviderId, name: selectedProviderId };
 
     return (
         <div className="max-w-md mx-auto mt-4 p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm animate-in slide-in-from-top-2 absolute left-0 right-0 md:relative md:left-auto md:right-auto shadow-xl md:shadow-none z-50 md:z-auto max-h-[85vh] overflow-y-auto">

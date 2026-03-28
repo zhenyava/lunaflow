@@ -1,30 +1,52 @@
-import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
-import { googleDriveProvider } from './GoogleDriveProvider';
+import { STORAGE_PROVIDER_KEY } from '../constants';
 
-class StorageProviderRegistry {
-  private providers: Map<string, RemoteStorageProvider> = new Map();
-
-  constructor() {
-    // Pre-register default providers
-    this.registerProvider(googleDriveProvider);
-  }
-
-  registerProvider(provider: RemoteStorageProvider): void {
-    this.providers.set(provider.id, provider);
-  }
-
-  getProvider(id: string): RemoteStorageProvider {
-    const provider = this.providers.get(id);
-    if (!provider) {
-      console.warn(`Storage provider with id '${id}' not found. Falling back to google-drive.`);
-      return this.providers.get('google-drive')!;
-    }
-    return provider;
-  }
-
-  getAllProviders(): RemoteStorageProvider[] {
-    return Array.from(this.providers.values());
-  }
+export interface ProviderDescriptor {
+  readonly id: string;
+  readonly name: string;
 }
 
-export const storageProviderRegistry = new StorageProviderRegistry();
+/**
+ * Pure catalog of available storage providers and which one is currently selected.
+ * Does not hold provider instances or manage auth — that is CalendarApp's responsibility.
+ */
+export class StorageProviderRegistry {
+  private _providers: Map<string, ProviderDescriptor> = new Map();
+  private _activeProviderId: string;
+  private _listeners = new Set<() => void>();
+
+  constructor() {
+    this._activeProviderId = localStorage.getItem(STORAGE_PROVIDER_KEY) ?? 'google-drive';
+  }
+
+  registerProvider(provider: ProviderDescriptor): void {
+    this._providers.set(provider.id, provider);
+  }
+
+  getProvider(id: string): ProviderDescriptor | undefined {
+    return this._providers.get(id);
+  }
+
+  getAllProviders(): ProviderDescriptor[] {
+    return Array.from(this._providers.values());
+  }
+
+  get activeProviderId(): string {
+    return this._activeProviderId;
+  }
+
+  setActiveProvider(id: string): void {
+    if (id === this._activeProviderId) return;
+    this._activeProviderId = id;
+    localStorage.setItem(STORAGE_PROVIDER_KEY, id);
+    this.notify();
+  }
+
+  subscribe(fn: () => void): () => void {
+    this._listeners.add(fn);
+    return () => this._listeners.delete(fn);
+  }
+
+  notify(): void {
+    this._listeners.forEach(fn => fn());
+  }
+}

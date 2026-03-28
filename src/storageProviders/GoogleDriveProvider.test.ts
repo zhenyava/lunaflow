@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleDriveProvider } from './GoogleDriveProvider';
-import type { DailyRecord, GoogleToken } from '../types';
 import { runProviderComplianceTests } from './providerComplianceTests';
+import { CLOUD_STORAGE_FILENAME, CLOUD_STORAGE_FOLDER_NAME } from '../constants';
 
 interface MockGapiResult<T = unknown> {
   result: T;
@@ -9,29 +9,15 @@ interface MockGapiResult<T = unknown> {
 
 describe('GoogleDriveProvider', () => {
   let provider: GoogleDriveProvider;
+  let mockGetToken: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    mockGetToken = vi.fn(async () => ({ access_token: 'test_token' }));
     vi.stubGlobal('fetch', vi.fn());
-    vi.stubGlobal('localStorage', {
-      getItem: vi.fn(),
-      setItem: vi.fn(),
-      removeItem: vi.fn(),
-      clear: vi.fn(),
-    });
     vi.stubGlobal('window', {
       ...window,
-      location: {
-        ...window.location,
-        hash: '',
-        pathname: '/',
-        search: ''
-      },
       gapi: {
-        load: vi.fn((_lib, cb) => cb()),
         client: {
-          init: vi.fn().mockResolvedValue(undefined),
-          getToken: vi.fn(),
-          setToken: vi.fn(),
           drive: {
             files: {
               list: vi.fn(),
@@ -42,7 +28,7 @@ describe('GoogleDriveProvider', () => {
         }
       }
     });
-    provider = new GoogleDriveProvider();
+    provider = new GoogleDriveProvider(mockGetToken);
   });
 
   afterEach(() => {
@@ -51,176 +37,108 @@ describe('GoogleDriveProvider', () => {
   });
 
   // Run the shared compliance test suite
-  runProviderComplianceTests(new GoogleDriveProvider());
+  runProviderComplianceTests(new GoogleDriveProvider(async () => ({ access_token: 't' })));
 
   it('should have the correct name and id', () => {
     expect(provider.name).toBe('Google Drive');
     expect(provider.id).toBe('google-drive');
   });
 
-  describe('initialize', () => {
-    it('should initialize GAPI client', async () => {
-      const onInit = vi.fn();
-      
-      // Mock script already present
-      const script = document.createElement('script');
-      script.src = "https://apis.google.com/js/api.js";
-      document.body.appendChild(script);
-
-      provider.initialize(onInit);
-      
-      // Wait for async initGapi to finish
-      await vi.waitFor(() => {
-        if (onInit.mock.calls.length === 0) throw new Error("Not called yet");
-      });
-
-      expect(window.gapi.load).toHaveBeenCalledWith('client', expect.any(Function));
-      expect(onInit).toHaveBeenCalledWith(true);
-      
-      document.body.removeChild(script);
-    });
-  });
-
-  describe('Auth Flow (ensureValidToken logic)', () => {
-    it('should return existing token if valid', async () => {
-      const validToken: GoogleToken = {
-        access_token: 'valid_token',
-        expires_in: 3600,
-        expires_at: Date.now() + 10000,
-        scope: 'scope',
-        token_type: 'Bearer'
-      };
-
-      vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify(validToken));
-      vi.mocked(window.gapi.client.getToken).mockReturnValue(validToken);
-
-      // We trigger ensureValidToken by calling a method that uses it, like fetchData
-      vi.mocked(window.gapi.client.drive.files.get).mockResolvedValue({ result: {} } as MockGapiResult);
-      
-      await provider.fetchData('file-id');
-      
-      expect(fetch).not.toHaveBeenCalledWith('/api/auth/refresh');
-    });
-
-    it('should refresh token if expired', async () => {
-      const expiredToken: GoogleToken = {
-        access_token: 'expired_token',
-        expires_in: 3600,
-        expires_at: Date.now() - 1000,
-        scope: 'scope',
-        token_type: 'Bearer'
-      };
-
-      const newToken = {
-        access_token: 'new_token',
-        expires_in: 3570
-      };
-
-      vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify(expiredToken));
-      vi.mocked(fetch).mockResolvedValue({
-        ok: true,
-        json: async () => newToken
-      } as Response);
-      
-      vi.mocked(window.gapi.client.drive.files.get).mockResolvedValue({ result: {} } as MockGapiResult);
-
-      await provider.fetchData('file-id');
-
-      expect(fetch).toHaveBeenCalledWith('/api/auth/refresh');
-      expect(localStorage.setItem).toHaveBeenCalledWith('lunaflow_auth_token', expect.stringContaining('new_token'));
-      expect(window.gapi.client.setToken).toHaveBeenCalled();
-    });
-  });
-
-  describe('signOut', () => {
-    it('should call logout API and cleanup local state', async () => {
-      await provider.signOut();
-
-      expect(fetch).toHaveBeenCalledWith('/api/auth/logout');
-      expect(window.gapi.client.setToken).toHaveBeenCalledWith(null);
-      expect(localStorage.removeItem).toHaveBeenCalledWith('lunaflow_auth_token');
-    });
-  });
-
   describe('Drive API Operations', () => {
+    const FILE_ID = 'test-file-id';
+
     it('should ensure drive file exists (found existing)', async () => {
-      const validToken: GoogleToken = { 
-        access_token: 't', 
-        expires_at: Date.now() + 10000,
-        expires_in: 3600,
-        scope: 's',
-        token_type: 'Bearer'
-      };
-      vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify(validToken));
-      
       // 1. Mock finding the folder
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
-        result: { files: [{ id: 'folder-id', name: 'LunaFlow' }] }
-      } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
-      
-      // 2. Mock finding the file
-      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
-        result: { files: [{ id: 'file-id', name: 'lunaflow_data.json' }] }
+        result: { files: [{ id: 'folder-id', name: CLOUD_STORAGE_FOLDER_NAME }] }
       } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
 
-      const fileId = await provider.ensureFileExists();
-      expect(fileId).toBe('file-id');
+      // 2. Mock finding the file
+      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
+        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+      } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
+
+      const ok = await provider.ensureFileExists(FILE_ID);
+      expect(ok).toBe(true);
+      expect(mockGetToken).toHaveBeenCalled();
+    });
+
+    it('should create folder and file if missing', async () => {
+      // 1. No folder found
+      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
+        result: { files: [] }
+      } as MockGapiResult<{ files: any[] }>);
+
+      // 2. Mock folder creation
+      vi.mocked(window.gapi.client.drive.files.create).mockResolvedValueOnce({
+        result: { id: 'new-folder-id' }
+      } as MockGapiResult<{ id: string }>);
+
+      // 3. No file found in folder
+      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
+        result: { files: [] }
+      } as MockGapiResult<{ files: any[] }>);
+
+      // 4. Mock file creation via fetch upload
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 'new-file-id' })
+      } as Response);
+
+      const ok = await provider.ensureFileExists(FILE_ID);
+      expect(ok).toBe(true);
+      expect(window.gapi.client.drive.files.create).toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('upload/drive/v3/files?uploadType=multipart'),
+        expect.any(Object)
+      );
     });
 
     it('should fetch data from drive', async () => {
-      const validToken: GoogleToken = { 
-        access_token: 't', 
-        expires_at: Date.now() + 10000,
-        expires_in: 3600,
-        scope: 's',
-        token_type: 'Bearer'
-      };
-      vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify(validToken));
-      
+      // We must call ensureFileExists first to populate _driveFileIds
+      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
+        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+      } as MockGapiResult<{ files: any[] }>);
+      await provider.ensureFileExists(FILE_ID);
+
       const mockData = { records: [] };
       vi.mocked(window.gapi.client.drive.files.get).mockResolvedValue({
         result: mockData
       } as MockGapiResult);
 
-      const data = await provider.fetchData('file-id');
+      const data = await provider.fetchData(FILE_ID);
       expect(data).toBe(mockData);
       expect(window.gapi.client.drive.files.get).toHaveBeenCalledWith({
-        fileId: 'file-id',
+        fileId: 'drive-file-id',
         alt: 'media'
       });
     });
 
     it('should upload data to drive', async () => {
-      const validToken: GoogleToken = { 
-        access_token: 't', 
-        expires_at: Date.now() + 10000,
-        expires_in: 3600,
-        scope: 's',
-        token_type: 'Bearer'
-      };
-      vi.mocked(localStorage.getItem).mockReturnValue(JSON.stringify(validToken));
-      
+      // Populate _driveFileIds
+      vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
+        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+      } as MockGapiResult<{ files: any[] }>);
+      await provider.ensureFileExists(FILE_ID);
+
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
-      const events: DailyRecord[] = [];
-      await provider.uploadData('file-id', events);
-      
+      const data = { foo: 'bar' };
+      await provider.uploadData(FILE_ID, data);
+
       expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining('https://www.googleapis.com/upload/drive/v3/files/file-id'),
-        expect.objectContaining({ method: 'PATCH' })
+        expect.stringContaining('https://www.googleapis.com/upload/drive/v3/files/drive-file-id'),
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify(data)
+        })
       );
     });
-  });
 
-  describe('isAuthenticated', () => {
-    it('should return true when token exists', () => {
-      vi.mocked(localStorage.getItem).mockReturnValue('some-token');
-      expect(provider.isAuthenticated()).toBe(true);
-    });
-
-    it('should return false when no token exists', () => {
-      vi.mocked(localStorage.getItem).mockReturnValue(null);
-      expect(provider.isAuthenticated()).toBe(false);
+    it('should return false if ensureFileExists fails', async () => {
+      vi.mocked(window.gapi.client.drive.files.list).mockRejectedValue(new Error('Network error'));
+      const ok = await provider.ensureFileExists(FILE_ID);
+      expect(ok).toBe(false);
     });
   });
 });

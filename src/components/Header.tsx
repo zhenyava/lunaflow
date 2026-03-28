@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
-import type { SyncIndicatorState, EventType } from '../types';
+import { Activity, RefreshCw, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
+import type { EventType } from '../types';
+import type { ProviderDescriptor } from '../storageProviders/StorageProviderRegistry';
+import type { CloudState } from '../store/DataStore';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
     avgCycleLength: number | null;
@@ -8,7 +10,7 @@ interface HeaderProps {
     activeType: EventType;
     setActiveType: (type: EventType) => void;
     isAuthenticated: boolean;
-    syncState: SyncIndicatorState;
+    syncState: CloudState;
     onSync: () => void;
     onLogin: () => void;
 
@@ -16,6 +18,7 @@ interface HeaderProps {
     isSettingsOpen: boolean;
     setSettingsOpen: (open: boolean) => void;
     selectedProviderId: string;
+    allProviders: ProviderDescriptor[];
     onProviderChange: (id: string) => void;
     onLogout: () => void;
 
@@ -64,6 +67,7 @@ export default function Header({
     isSettingsOpen,
     setSettingsOpen,
     selectedProviderId,
+    allProviders,
     onProviderChange,
     onLogout,
     isEditMode,
@@ -75,17 +79,18 @@ export default function Header({
     const navigate = useNavigate();
 
     const getSyncIcon = () => {
-        if (syncState.status === 'offline') {
+        if (syncState === 'unsynced') {
             return <WifiOff size={20} className="text-amber-500" />;
         }
-        if (syncState.status === 'syncing') {
+        if (syncState === 'uploading' || syncState === 'syncing') {
             return <RefreshCw size={20} className="animate-spin text-yellow-500" />;
         }
-        if (syncState.status === 'error') {
-            return <AlertCircle size={20} className="text-red-500" />;
-        }
-        if (isAuthenticated) {
+        if (syncState === 'synced') {
             return <Cloud size={20} className="text-green-500" />;
+        }
+        // 'unsynced': authenticated with pending upload, or not yet signed in
+        if (isAuthenticated) {
+            return <Cloud size={20} className="text-amber-400" />;
         }
         return <CloudOff size={20} className="text-gray-400" />;
     };
@@ -191,11 +196,12 @@ export default function Header({
                </div>
             </div>
     
-            <SettingsModal 
+            <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}
                 selectedProviderId={selectedProviderId}
+                allProviders={allProviders}
                 onProviderChange={onProviderChange}
                 onLogin={onLogin}
                 onLogout={onLogout}

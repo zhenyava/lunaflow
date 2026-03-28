@@ -4,7 +4,7 @@ import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
 /**
  * A shared test suite to verify that any given RemoteStorageProvider
  * complies with the expected interface contract.
- * 
+ *
  * @param provider The instantiated provider to test.
  */
 export function runProviderComplianceTests(provider: RemoteStorageProvider) {
@@ -17,18 +17,9 @@ export function runProviderComplianceTests(provider: RemoteStorageProvider) {
     });
 
     it('should implement all required methods', () => {
-      expect(typeof provider.initialize).toBe('function');
-      expect(typeof provider.signIn).toBe('function');
-      expect(typeof provider.signOut).toBe('function');
       expect(typeof provider.ensureFileExists).toBe('function');
       expect(typeof provider.fetchData).toBe('function');
       expect(typeof provider.uploadData).toBe('function');
-      expect(typeof provider.isAuthenticated).toBe('function');
-      expect(typeof provider.restoreSession).toBe('function');
-      
-      if (provider.handleCallback !== undefined) {
-        expect(typeof provider.handleCallback).toBe('function');
-      }
     });
   });
 }

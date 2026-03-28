@@ -1,9 +1,9 @@
-export const APP_DATA_FILENAME = 'lunaflow_data.json';
 
 export const LAUNCHED_KEY = 'lunaflow_has_launched';
 export const STORAGE_PROVIDER_KEY = 'lunaflow_storage_provider';
-export const STORAGE_CURRENT_VERSION = 2;
-export const STORAGE_FOLDER_NAME = 'LunaFlow';
+export const STORAGE_CURRENT_VERSION = 1;
+export const CLOUD_STORAGE_FOLDER_NAME = 'LunaFlow';
+export const CLOUD_STORAGE_FILENAME = 'lunaflow_data.json';
 
 // Colors for the calendar
 export const PERIOD_COLOR = 'bg-rose-500 text-white hover:bg-rose-600';

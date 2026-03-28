@@ -20,7 +20,7 @@ export interface SymptomCategory {
  */
 export interface DailyRecord {
   /** The date of the record in ISO YYYY-MM-DD format (e.g., "2024-03-24"). Acts as the Primary Key. */
-  date: string; 
+  date: string;
 
   /** 
    * Data related to menstrual flow for this day. 
@@ -54,35 +54,6 @@ export interface DailyRecord {
    * and not "resurrected" by the Google Drive sync engine.
    */
   isDeleted?: boolean;
-}
-
-/** 
- * Legacy format used in the initial version of the app.
- * Retained temporarily to support automatic data migration.
- */
-export interface LegacyCalendarEvent {
-  date: string;
-  type: EventType;
-}
-
-export interface UserProfile {
-  name: string;
-  email: string;
-  picture: string;
-}
-
-/** UI-only feedback type consumed by Header to display the sync icon. */
-export interface SyncIndicatorState {
-  status: 'idle' | 'syncing' | 'success' | 'error' | 'offline';
-  lastSynced?: Date;
-}
-
-export interface GoogleToken {
-  access_token: string;
-  expires_in: number;
-  scope: string;
-  token_type: string;
-  expires_at?: number; // Calculated expiration timestamp
 }
 
 /**

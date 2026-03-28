@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useReducer, useCallback } from 'react';
 import { addMonths, format, subMonths, eachMonthOfInterval, startOfMonth } from 'date-fns';
 import { Edit3 } from 'lucide-react';
 import Header from './Header';
@@ -7,24 +7,96 @@ import DesktopCalendarView from './DesktopCalendarView';
 import MobileControls from './MobileControls';
 import DayDetailsPanel from './DayDetailsPanel';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
-import { useRemoteSync } from '../hooks/useRemoteSync';
 import { useCycleStats } from '../hooks/useCycleStats';
-import { storageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
-import { STORAGE_PROVIDER_KEY } from '../constants';
+import { GoogleAuthProvider } from '../auth/GoogleAuthProvider';
+import { GoogleDriveProvider } from '../storageProviders/GoogleDriveProvider';
+import { StorageProviderRegistry } from '../storageProviders/StorageProviderRegistry';
+import { RecordsStore } from '../store/RecordsStore';
 
 // Generate a range of months for the Mobile "Infinite" list
 const INITIAL_START_DATE = subMonths(startOfMonth(new Date()), 12);
 const INITIAL_END_DATE = addMonths(startOfMonth(new Date()), 12);
 
 function CalendarApp() {
+  // Singleton instances — created once per mount
+  const authProvider = useMemo(() => new GoogleAuthProvider(), []);
+  const registry = useMemo(() => {
+    const r = new StorageProviderRegistry();
+    r.registerProvider({ id: 'google-drive', name: 'Google Drive' });
+    return r;
+  }, []);
+  const recordsStore = useMemo(() => {
+    const rs = new RecordsStore();
+    rs.onSyncError = () => { console.error('Sync failed: Unauthorized'); };
+    return rs;
+  }, []);
+
+  // React bridge: re-render when store or auth changes
+  const [, rerender] = useReducer((x: number) => x + 1, 0);
+
+  // Lifecycle: init store, initialize auth, connect remote if authenticated
+  useEffect(() => {
+    recordsStore.init();
+
+    authProvider.initialize().then(async () => {
+      if (!authProvider.isAuthenticated()) return;
+      try {
+        const provider = new GoogleDriveProvider(() => authProvider.getToken());
+        await recordsStore.connectRemote(provider);
+      } catch (e) {
+        console.error('Failed to connect remote', e);
+        await authProvider.signOut();
+      }
+    });
+
+    const unsubStore = recordsStore.subscribe(rerender);
+    const unsubAuth = authProvider.onAuthStateChange(() => rerender());
+    const unsubRegistry = registry.subscribe(rerender);
+
+    return () => {
+      recordsStore.destroy();
+      unsubStore();
+      unsubAuth();
+      unsubRegistry();
+    };
+  }, [authProvider, recordsStore, registry]);
+
+  // Auth actions
+  const handleLogin = useCallback(async () => {
+    await authProvider.signIn();
+  }, [authProvider]);
+
+  const handleLogout = useCallback(async () => {
+    recordsStore.disconnectRemote();
+    await authProvider.signOut();
+  }, [authProvider, recordsStore]);
+
+  const forceSync = useCallback(() => {
+    recordsStore.forceSync();
+  }, [recordsStore]);
+
+  const handleProviderChange = useCallback((id: string) => {
+    recordsStore.disconnectRemote();
+    if (authProvider.isAuthenticated()) authProvider.signOut();
+    registry.setActiveProvider(id);
+  }, [authProvider, recordsStore, registry]);
+
+  const isAuthenticated = authProvider.isAuthenticated();
+  const cloudState = recordsStore.cloudState;
+  const selectedProviderId = registry.activeProviderId;
+  const allProviders = registry.getAllProviders();
+
+  // Domain mutations hook
+  const { events, activeType, setActiveType, handleDayClick, updateRecord } = useCalendarEvents(recordsStore);
+
   // Mobile uses a long list of months
-  const [mobileMonths] = useState<Date[]>(() => 
+  const [mobileMonths] = useState<Date[]>(() =>
     eachMonthOfInterval({ start: INITIAL_START_DATE, end: INITIAL_END_DATE })
   );
-  
+
   // Desktop uses a single year view
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-  
+
   // Config State for UI (Settings Modal)
   const [isSettingsOpen, setSettingsOpen] = useState(false);
 
@@ -32,67 +104,21 @@ function CalendarApp() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  // Online/Offline state (passed to useRemoteSync; effect registered after hook call below)
-  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
-
-  // Provider State
-  const [selectedProviderId, setSelectedProviderId] = useState(() => {
-     return localStorage.getItem(STORAGE_PROVIDER_KEY) || 'google-drive';
-  });
-
-  const provider = useMemo(() => {
-     return storageProviderRegistry.getProvider(selectedProviderId);
-  }, [selectedProviderId]);
-
-  // Custom Hooks
-  const { 
-    events,         // Filtered (isDeleted: false)
-    allRecords,     // Full (includes tombstones)
-    setEvents,      // Updater (affects allRecords)
-    activeType, 
-    setActiveType, 
-    handleDayClick,
-    updateRecord
-  } = useCalendarEvents();
-
-  const {
-    isAuthenticated,
-    syncState,
-    handleLogin,
-    handleLogout,
-    performFullSync,
-    remoteFileId
-  } = useRemoteSync({
-      events: allRecords, // Pass raw records for sync
-      setEvents,
-      provider,
-      isOnline
-  });
-
-  const displaySyncState = !isOnline ? { status: 'offline' as const } : syncState;
-
-  // Online/Offline Detection — registered here so performFullSync/remoteFileId are in scope
+  // Environment awareness: CalendarApp owns online/offline/focus detection
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      if (isAuthenticated && remoteFileId) performFullSync(remoteFileId);
-    };
+    const handleOnline = () => { setIsOnline(true); forceSync(); };
     const handleOffline = () => setIsOnline(false);
+    const handleFocus = () => forceSync();
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('focus', handleFocus);
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('focus', handleFocus);
     };
-  }, [isAuthenticated, remoteFileId, performFullSync]);
-
-  const handleProviderChange = useCallback(async (newId: string) => {
-      if (isAuthenticated) {
-          await handleLogout();
-      }
-      setSelectedProviderId(newId);
-      localStorage.setItem(STORAGE_PROVIDER_KEY, newId);
-  }, [isAuthenticated, handleLogout]);
+  }, [forceSync]);
 
   // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
@@ -148,18 +174,19 @@ function CalendarApp() {
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
-      <Header 
+      <Header
         avgCycleLength={avgCycleLength}
         avgPeriodDuration={avgPeriodDuration}
         activeType={activeType}
         setActiveType={setActiveType}
         isAuthenticated={isAuthenticated}
-        syncState={displaySyncState}
-        onSync={() => remoteFileId && performFullSync(remoteFileId)}
+        syncState={isOnline ? cloudState : 'unsynced'}
+        onSync={() => isAuthenticated && forceSync()}
         onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}
         selectedProviderId={selectedProviderId}
+        allProviders={allProviders}
         onProviderChange={handleProviderChange}
         onLogout={handleLogout}
         isEditMode={isEditMode}
@@ -172,8 +199,9 @@ function CalendarApp() {
       {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden relative">
         <main ref={scrollRef} className={`flex-1 overflow-y-auto no-scrollbar scroll-smooth relative bg-white md:bg-slate-50 ${selectedDate ? 'pb-[40vh] md:pb-0' : ''}`}>
-          
-          <MobileCalendarView 
+
+
+          <MobileCalendarView
               months={mobileMonths}
               events={events} // UI uses cleaned events
               predictedDates={predictedDates}
@@ -182,7 +210,7 @@ function CalendarApp() {
               selectedDate={selectedDate}
           />
 
-          <DesktopCalendarView 
+          <DesktopCalendarView
               months={desktopMonths}
               events={events} // UI uses cleaned events
               predictedDates={predictedDates}
@@ -195,7 +223,7 @@ function CalendarApp() {
         {/* Desktop Side Panel */}
         {selectedDate && (
           <div className="hidden md:block w-80 border-l border-slate-200 bg-white shadow-[-4px_0_24px_rgba(0,0,0,0.02)] z-20">
-            <DayDetailsPanel 
+            <DayDetailsPanel
               date={selectedDate}
               record={selectedRecord}
               onClose={() => setSelectedDate(null)}
@@ -208,11 +236,11 @@ function CalendarApp() {
       {/* Mobile Bottom Sheet */}
       {selectedDate && (
         <div className="md:hidden">
-          <div 
+          <div
             className="fixed inset-0 bg-black/20 z-40 animate-in fade-in"
             onClick={() => setSelectedDate(null)}
           />
-          <DayDetailsPanel 
+          <DayDetailsPanel
             date={selectedDate}
             record={selectedRecord}
             onClose={() => setSelectedDate(null)}
@@ -235,7 +263,7 @@ function CalendarApp() {
       )}
 
       {isEditMode && (
-        <MobileControls 
+        <MobileControls
           activeType={activeType}
           setActiveType={setActiveType}
           onDone={() => setIsEditMode(false)}

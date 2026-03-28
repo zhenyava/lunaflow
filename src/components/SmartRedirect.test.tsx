@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { render, waitFor } from '@testing-library/react';
 import SmartRedirect from './SmartRedirect';
 import { LAUNCHED_KEY } from '../constants';
-import * as storageService from '../services/storageService';
+import { recordsStore } from '../store/RecordsStore';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 
 const mockNavigate = vi.fn();
@@ -26,7 +26,7 @@ describe('SmartRedirect', () => {
     mockNavigate.mockClear();
     localStorage.clear();
     // Default mock for getStoredEvents to return empty array
-    vi.spyOn(storageService, 'getStoredEvents').mockResolvedValue([]);
+    vi.spyOn(recordsStore, 'getLocalEvents').mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -62,7 +62,7 @@ describe('SmartRedirect', () => {
   });
 
   it('redirects to /calendar if user has stored events', async () => {
-    vi.spyOn(storageService, 'getStoredEvents').mockResolvedValue([makePeriodRecord('2023-01-01')]);
+    vi.spyOn(recordsStore, 'getLocalEvents').mockResolvedValue([makePeriodRecord('2023-01-01')]);
 
     renderComponent();
 
@@ -84,7 +84,7 @@ describe('SmartRedirect', () => {
     const originalConsoleError = console.error;
     console.error = vi.fn(); // Hide the error in test output
 
-    vi.spyOn(storageService, 'getStoredEvents').mockRejectedValue(new Error('Storage access denied'));
+    vi.spyOn(recordsStore, 'getLocalEvents').mockRejectedValue(new Error('Storage access denied'));
 
     const { getByTestId } = renderComponent();
 

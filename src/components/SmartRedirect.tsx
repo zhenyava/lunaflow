@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import { LAUNCHED_KEY } from '../constants';
-import { getStoredEvents } from '../services/storageService';
+import { readDailyRecords } from '../store/indexedDBStorage';
 
 const SmartRedirect = () => {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ const SmartRedirect = () => {
     const checkAndRedirect = async () => {
       try {
         const hasLaunched = localStorage.getItem(LAUNCHED_KEY);
-        const storedEvents = await getStoredEvents();
+        const storedEvents = (await readDailyRecords()) ?? [];
 
         // If user has launched app before OR has data -> go to calendar
         if (hasLaunched || storedEvents.length > 0) {

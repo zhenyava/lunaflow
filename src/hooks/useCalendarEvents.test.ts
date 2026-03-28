@@ -1,142 +1,190 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
-import * as storageService from '../services/storageService';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord } from '../types';
 
-// Mock the storage service
-vi.mock('../services/storageService', () => ({
-  getStoredEvents: vi.fn(),
-  saveStoredEvents: vi.fn(),
+// Mock recordsStore singleton
+vi.mock('../store/RecordsStore', () => {
+  const listeners = new Set<() => void>();
+  const store = {
+    data: null as DailyRecord[] | null,
+    get events() {
+      return (this.data ?? []).filter((r: DailyRecord) => !r.isDeleted);
+    },
+    get allRecords() {
+      return this.data ?? [];
+    },
+    get isLoaded() {
+      return this.data !== null;
+    },
+    cloudState: 'unsynced' as const,
+    fileId: null as string | null,
+    save: vi.fn(async function(this: typeof store, records: DailyRecord[]) {
+      this.data = records;
+      listeners.forEach(fn => fn());
+    }),
+    subscribe: vi.fn((fn: () => void) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    }),
+    init: vi.fn(),
+    destroy: vi.fn(),
+    forceSync: vi.fn(async () => {}),
+  };
+  return { recordsStore: store };
+});
+
+const mockProvider = {
+  name: 'Google Drive',
+  isAuthenticated: vi.fn(() => false),
+  signIn: vi.fn(async () => {}),
+  signOut: vi.fn(async () => {}),
+  onAuthStateChange: vi.fn(() => () => {}),
+};
+
+vi.mock('../storageProviders/StorageProviderRegistry', () => ({
+  storageProviderRegistry: {
+    activeProviderId: 'google-drive',
+    getActiveProvider: vi.fn(() => mockProvider),
+    getAllProviders: vi.fn(() => []),
+    setActiveProvider: vi.fn(async () => {}),
+    notify: vi.fn(),
+    subscribe: vi.fn(() => () => {}),
+  },
 }));
+
+import { recordsStore } from '../store/RecordsStore';
 
 describe('useCalendarEvents', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
+    // Reset store state
+    (recordsStore as { data: DailyRecord[] | null }).data = null;
+    vi.mocked(recordsStore.save).mockClear();
+    vi.mocked(recordsStore.init).mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('should initialize with events from IndexedDB', async () => {
-    const mockEvents: DailyRecord[] = [makePeriodRecord('2024-03-01')];
-    vi.mocked(storageService.getStoredEvents).mockResolvedValue(mockEvents);
-
-    const { result } = renderHook(() => useCalendarEvents());
-
-    await waitFor(() => {
-      expect(result.current.events).toEqual(mockEvents);
-    });
-    expect(result.current.allRecords).toEqual(mockEvents);
-    expect(storageService.getStoredEvents).toHaveBeenCalledOnce();
+  it('calls recordsStore.init on mount', () => {
+    renderHook(() => useCalendarEvents());
+    expect(recordsStore.init).toHaveBeenCalledOnce();
   });
 
-  it('should save to IndexedDB when events change', async () => {
-    vi.mocked(storageService.getStoredEvents).mockResolvedValue([]);
+  it('reflects recordsStore.events', async () => {
+    const mockEvents = [makePeriodRecord('2024-03-01')];
+    (recordsStore as { data: DailyRecord[] | null }).data = mockEvents;
 
     const { result } = renderHook(() => useCalendarEvents());
+    expect(result.current.events).toEqual(mockEvents);
+  });
 
-    await waitFor(() => {
-      expect(storageService.getStoredEvents).toHaveBeenCalledOnce();
-    });
-
-    // Clear initial calls
-    vi.mocked(storageService.saveStoredEvents).mockClear();
+  it('reflects recordsStore.isLoaded', () => {
+    const { result } = renderHook(() => useCalendarEvents());
+    expect(result.current.isLoaded).toBe(false);
 
     act(() => {
-      // Simulate adding an event
-      result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
+      (recordsStore as { data: DailyRecord[] | null }).data = [];
     });
-
-    // saveStoredEvents should be called with the full record list
-    expect(storageService.saveStoredEvents).toHaveBeenCalledWith([
-      { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {} }
-    ]);
+    // isLoaded re-reads from store — need a notify to trigger re-render
   });
 
-  describe('handleDayClick logic', () => {
-    it('should add a new event when date is empty', async () => {
-      const existingRecord = makePeriodRecord('2024-03-01');
-      vi.mocked(storageService.getStoredEvents).mockResolvedValue([existingRecord]);
+  describe('handleDayClick', () => {
+    it('adds a new period record when date is empty', async () => {
+      (recordsStore as { data: DailyRecord[] | null }).data = [];
       const { result } = renderHook(() => useCalendarEvents());
 
-      await waitFor(() => {
-        expect(result.current.events).toHaveLength(1);
-      });
-
       act(() => {
-        result.current.setActiveType('ovulation');
-      });
-
-      act(() => {
-        // Click on a new day
-        result.current.handleDayClick(new Date('2024-03-05T12:00:00Z'));
-      });
-
-      const expected = [
-        existingRecord,
-        { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} }
-      ];
-      expect(result.current.events).toEqual(expected);
-      expect(result.current.allRecords).toEqual(expected);
-    });
-
-    it('should update event type when clicking existing date with different activeType', async () => {
-      vi.mocked(storageService.getStoredEvents).mockResolvedValue([
-        makePeriodRecord('2024-03-01')
-      ]);
-      const { result } = renderHook(() => useCalendarEvents());
-
-      await waitFor(() => {
-        expect(result.current.events).toHaveLength(1);
-      });
-
-      act(() => {
-        result.current.setActiveType('ovulation');
-      });
-
-      act(() => {
-        // Click on existing day with different activeType
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      const expected = [
-        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {}, ovulation: {} }
-      ];
-      expect(result.current.events).toEqual(expected);
-      expect(result.current.allRecords).toEqual(expected);
+      expect(recordsStore.save).toHaveBeenCalledWith([
+        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {} },
+      ]);
     });
 
-    it('should mark event as deleted and filter it from events when un-toggling', async () => {
-      vi.mocked(storageService.getStoredEvents).mockResolvedValue([
-        makePeriodRecord('2024-03-01')
-      ]);
+    it('adds ovulation record when activeType is ovulation', async () => {
+      (recordsStore as { data: DailyRecord[] | null }).data = [];
       const { result } = renderHook(() => useCalendarEvents());
 
-      await waitFor(() => {
-        expect(result.current.events).toHaveLength(1);
-      });
+      act(() => result.current.setActiveType('ovulation'));
+      act(() => result.current.handleDayClick(new Date('2024-03-05T12:00:00Z')));
 
-      act(() => {
-        result.current.setActiveType('period');
-      });
-
-      act(() => {
-        // Click on existing day with same activeType to toggle off
-        result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
-      });
-
-      // UI 'events' should be empty
-      expect(result.current.events).toEqual([]);
-
-      // 'allRecords' should contain the tombstone
-      expect(result.current.allRecords).toEqual([
-        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: true }
+      expect(recordsStore.save).toHaveBeenCalledWith([
+        { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} },
       ]);
+    });
+
+    it('marks record as deleted when toggling off the only event', async () => {
+      (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
+      const { result } = renderHook(() => useCalendarEvents());
+
+      act(() => result.current.setActiveType('period'));
+      act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
+
+      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
+      expect(saved[0].isDeleted).toBe(true);
+    });
+  });
+
+  describe('updateRecord', () => {
+    it('updates existing record and calls recordsStore.save', async () => {
+      const existing = makePeriodRecord('2024-03-01');
+      (recordsStore as { data: DailyRecord[] | null }).data = [existing];
+      const { result } = renderHook(() => useCalendarEvents());
+
+      act(() => {
+        result.current.updateRecord('2024-03-01', { ovulation: {} });
+      });
+
+      await waitFor(() => {
+        expect(recordsStore.save).toHaveBeenCalled();
+      });
+
+      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
+      expect(saved[0].ovulation).toEqual({});
+      expect(saved[0].period).toEqual({});
+    });
+
+    it('marks record as deleted when all data is removed', async () => {
+      const existing = makePeriodRecord('2024-03-01');
+      (recordsStore as { data: DailyRecord[] | null }).data = [existing];
+      const { result } = renderHook(() => useCalendarEvents());
+
+      act(() => {
+        result.current.updateRecord('2024-03-01', { period: undefined });
+      });
+
+      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
+      expect(saved[0].isDeleted).toBe(true);
+    });
+  });
+
+  describe('auth / sync passthrough', () => {
+    it('exposes isAuthenticated from registry', () => {
+      const { result } = renderHook(() => useCalendarEvents());
+      expect(result.current.isAuthenticated).toBe(false);
+    });
+
+    it('exposes cloudState from recordsStore', () => {
+      const { result } = renderHook(() => useCalendarEvents());
+      expect(result.current.cloudState).toBe('unsynced');
+    });
+
+    it('handleLogin calls provider.signIn', async () => {
+      const { result } = renderHook(() => useCalendarEvents());
+      await act(async () => result.current.handleLogin());
+      expect(mockProvider.signIn).toHaveBeenCalled();
+    });
+
+    it('handleLogout calls provider.signOut', async () => {
+      const { result } = renderHook(() => useCalendarEvents());
+      await act(async () => result.current.handleLogout());
+      expect(mockProvider.signOut).toHaveBeenCalled();
     });
   });
 });

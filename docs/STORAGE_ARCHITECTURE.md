@@ -1,118 +1,275 @@
-# LunaFlow Storage Architecture & Migration
+# LunaFlow Storage Architecture
 
-This document outlines the approach used to store, version, and migrate data in LunaFlow.
+This document outlines the architecture used to store, sync, and version data in LunaFlow.
 
 ## Core Concepts
 
 1. **`DailyRecord`**: The single source of truth for a calendar day. All events (period, ovulation) are nested inside this single object.
-2. **Versioned Envelope**: Data is always stored locally and on Google Drive wrapped in an envelope containing a version number:
+2. **Versioned Envelope**: Data on Google Drive is wrapped in an envelope containing a version number:
    ```json
    {
-     "ver": 2,
+     "ver": 1,
      "records": [ { "date": "2024-01-01", ... } ]
    }
    ```
-3. **Transport Layer vs. Business Logic**:
-   - **Storage Providers** (in `src/storageProviders/`): Abstract implementations of the `RemoteStorageProvider` interface. They handle the specifics of each vendor's API (e.g., `googleService.ts` for Google Drive).
-   - `storageService.ts` handles **IndexedDB** (local storage), merging, and is the entry point for migration (`parseAndMigrateData`).
-   - `migrationService.ts` is a registry of transformation functions. It defines the `migrations` array.
+3. **Layered Architecture**:
+
+```
+CalendarApp.tsx  ← app shell: creates all instances, owns auth + store lifecycle
+  ├── GoogleAuthProvider     ← OAuth, tokens, GAPI SDK init, sign-in/out
+  ├── GoogleDriveProvider    ← pure storage: ensureFileExists, fetchData, uploadData
+  ├── StorageProviderRegistry ← pure catalog: provider list + active selection
+  └── RecordsStore           ← local persistence + sync orchestration
+
+useCalendarEvents(store)  ← domain mutations only (handleDayClick, updateRecord)
+```
+
+---
+
+## Component Responsibilities
+
+### `GoogleAuthProvider` (`src/auth/`)
+
+Owns all OAuth concerns:
+- `initialize()` — parse OAuth redirect callback, load GAPI script, restore token from localStorage
+- `signIn()` / `signOut()` — redirect to `/api/auth/login`, call `/api/auth/logout`
+- `isAuthenticated()` — checks localStorage for a valid token
+- `getToken()` — returns a valid token, auto-refreshes via `/api/auth/refresh` if expired, syncs to GAPI client
+- `onAuthStateChange(fn)` — subscriber pattern; fires on sign-in/sign-out
+
+**No singleton export.** Instance created via `useMemo` in `CalendarApp`.
+
+---
+
+### `GoogleDriveProvider` (`src/storageProviders/`)
+
+Pure storage — no auth knowledge. Receives a `getToken` function via constructor injection:
+
+```typescript
+new GoogleDriveProvider(() => authProvider.getToken())
+```
+
+- `ensureFileExists(fileId: string): Promise<boolean>` — finds or creates the LunaFlow folder + file on Drive; maps logical `fileId` → Drive internal file ID internally
+- `fetchData(fileId)` — calls `getToken()` to ensure GAPI is ready, then fetches from Drive
+- `uploadData(fileId, data)` — calls `getToken()`, then PATCHes to Drive
+
+The logical `fileId` (e.g. `'lunaflow_data'`) is defined by `DataStore`. `GoogleDriveProvider` maps it to the real Drive file ID in a private `Map<string, string>`.
+
+**No singleton export.** Instance created lazily inside `CalendarApp.init()` when user is authenticated.
+
+---
+
+### `StorageProviderRegistry` (`src/storageProviders/`)
+
+Pure catalog of available providers and which one is selected:
+- `registerProvider({ id, name })` — add a provider descriptor
+- `getAllProviders()` — returns `{ id, name }[]` for the UI
+- `activeProviderId` / `setActiveProvider(id)` — persisted to localStorage
+- `subscribe(fn)` / `notify()` — triggers CalendarApp re-renders on selection change
+
+Does **not** hold provider instances, handle auth, or call `signOut()`. Those are CalendarApp's responsibility.
+
+**No singleton export.** Instance created via `useMemo` in `CalendarApp`.
+
+---
+
+### `DataStore<T>` (`src/store/`)
+
+Abstract base class (plain TypeScript, no React) that handles:
+
+- **Cache-first load**: `init()` reads local data immediately so UI renders before auth completes
+- **`save(data)`**: writes to IndexedDB, schedules a debounced upload (2 s) to cloud
+- **`forceSync()`**: fetch → merge → upload cycle; sets `cloudState` throughout
+- **`connectRemote(provider)`**: sets the provider, calls `provider.ensureFileExists(this.fileId)`, triggers `forceSync()`
+- **`disconnectRemote()`**: clears provider, resets `cloudState` to `'unsynced'`
+- **`onSyncError`**: callback set by CalendarApp; called on 401 errors so CalendarApp can sign out
+- **`fileId`**: abstract getter — subclasses define their stable logical file key
+- **Subscriber pattern**: `subscribe(fn)` / `notify()` for React re-renders
+
+Abstract methods subclasses must implement:
+
+```typescript
+abstract get fileId(): string;
+protected abstract loadLocal(): Promise<T | null>;
+protected abstract saveLocal(data: T): Promise<void>;
+protected abstract merge(local: T, remote: T): T;
+protected abstract fetchFromCloud(fileId: string): Promise<T>;
+protected abstract pushToCloud(fileId: string, data: T): Promise<void>;
+```
+
+---
+
+### `RecordsStore` (`src/store/`)
+
+Concrete `DataStore<DailyRecord[]>`:
+- `get fileId()` returns `'lunaflow_data'` — the stable logical key
+- `loadLocal()` / `saveLocal()` — reads/writes `DailyRecord[]` to IndexedDB
+- `merge()` — last-write-wins by `updatedAt`
+- `fetchFromCloud()` — fetches raw JSON, runs migration pipeline
+- `pushToCloud()` — wraps in `{ ver, records }` envelope and uploads
+
+Exposes derived views:
+- `events` — filtered (excludes tombstones with `isDeleted: true`)
+- `allRecords` — full array including tombstones
+- `isLoaded` — `true` once the first IndexedDB read completes
+
+**No singleton export.** Instance created via `useMemo` in `CalendarApp`.
+
+---
+
+### `CalendarApp` (`src/components/`)
+
+The app shell and orchestrator. Creates all instances once via `useMemo`:
+
+```typescript
+const authProvider = useMemo(() => new GoogleAuthProvider(), []);
+const registry    = useMemo(() => new StorageProviderRegistry(), []);
+const recordsStore = useMemo(() => new RecordsStore(), []);
+```
+
+Lifecycle `useEffect`:
+1. `recordsStore.init()` — load local data (cache-first, runs immediately)
+2. `authProvider.initialize()` — parse callback, load GAPI, restore token
+3. If authenticated → create `GoogleDriveProvider` lazily, call `recordsStore.connectRemote(provider)`
+4. Subscribe to store + auth + registry changes for React re-renders
+5. Set `recordsStore.onSyncError` → calls `authProvider.signOut()` on 401
+
+Owns browser env concerns: online/offline/focus listeners for `forceSync()`.
+
+---
+
+### `useCalendarEvents(store)` (`src/hooks/`)
+
+Domain mutations only — no lifecycle, no auth:
+- `handleDayClick(date)` — toggle period/ovulation on a day
+- `updateRecord(dateStr, updates)` — merge partial updates into a record
+- `events`, `isLoaded`, `activeType`, `setActiveType`
+
+Receives `store: RecordsStore` as a parameter (no singleton import).
+
+---
+
+## Sync Flows
+
+### 1. App start
+
+```
+CalendarApp mounts
+  │
+  ├─► recordsStore.init()
+  │       └─► loadLocal() ──────────────────────────► update UI (cache-first)
+  │
+  └─► authProvider.initialize()
+          ├─► handleCallback()  (parse OAuth redirect if present)
+          ├─► initGapi()        (load GAPI script + client.init)
+          └─► restoreGapiSession()
+                  │
+                  └─► [if isAuthenticated()]
+                          └─► new GoogleDriveProvider(getToken)
+                                  └─► recordsStore.connectRemote(provider)
+                                          ├─► provider.ensureFileExists('lunaflow_data')
+                                          └─► forceSync()
+```
+
+### 2. User edit (`save(data)`)
+
+```
+save(data)
+  │
+  ├─► saveLocal(data)           (IndexedDB write, synchronous to user)
+  ├─► cloudState = 'unsynced'
+  ├─► notify()                  (UI re-renders)
+  └─► scheduleUpload(data)      (cancel previous 2s timer, start new one)
+          └─► [2s later, if provider connected + online]
+                  ├─► cloudState = 'uploading'
+                  ├─► notify()
+                  ├─► pushToCloud('lunaflow_data', data)
+                  ├─► cloudState = 'synced'
+                  └─► notify()
+```
+
+### 3. Full sync (`forceSync()`)
+
+Triggered by: `connectRemote`, online event, focus event.
+
+```
+forceSync()
+  │
+  ├─► [guard: provider not connected → return]
+  ├─► cloudState = 'uploading'
+  ├─► notify()
+  ├─► fetchFromCloud('lunaflow_data') ──► migrateData()  →  remote: T
+  ├─► merge(local, remote)             ──► merged: T
+  │
+  ├─► [if merged ≠ local]  saveLocal(merged)
+  ├─► [if merged ≠ remote] pushToCloud('lunaflow_data', merged)
+  │
+  ├─► cloudState = 'synced'
+  └─► notify()
+```
+
+### 4. Error handling
+
+```
+any sync error
+  │
+  ├─► cloudState = 'unsynced'   (data is safe locally; next sync will retry)
+  ├─► notify()
+  └─► [if 401 / Unauthorized]
+          ├─► _remoteStorageProvider = null   (disconnects remote)
+          └─► onSyncError?.()                 (CalendarApp calls authProvider.signOut())
+```
+
+### `cloudState` vs display state
+
+`cloudState` (`'unsynced' | 'uploading' | 'synced'`) is a domain value. The UI adds one extra state at the `CalendarApp` layer:
+
+```typescript
+const displaySyncState = { status: navigator.onLine ? cloudState : 'offline' as const };
+```
+
+`'offline'` is a display-only concern — never stored in `DataStore`.
+
+---
 
 ## Local Storage: IndexedDB
 
-LunaFlow uses **IndexedDB** (not localStorage) for local data persistence. IndexedDB provides:
-- Async API (non-blocking)
-- ~50MB+ storage limit vs localStorage's 5-10MB
-- Better eviction behavior in Safari PWA context
-
-### Database Layout
-
-- **Database**: `lunaflow` (version 1)
+LunaFlow uses **IndexedDB** (not localStorage) for local data persistence:
+- **Database**: `lunaflow`
 - **Object Store**: `appData`
 - **Key**: `events`
-- **Value**: versioned blob `{ ver: 2, records: DailyRecord[] }`
+- **Value**: `DailyRecord[]`
 
-### API
+All IndexedDB I/O is in `src/store/indexedDBStorage.ts` (`readDailyRecords`, `writeDailyRecords`).
 
-```typescript
-// Read records (async, runs migration pipeline)
-const records = await getStoredEvents();
+---
 
-// Write records (async)
-await saveStoredEvents(records);
-```
+## Migration Pipeline
 
-Both functions are in `src/services/storageService.ts` and are implemented using the native IndexedDB API — no external library.
+`RecordsStore.fetchFromCloud()` calls `migrateData(rawData)` on every cloud fetch.
 
-### Async Initialization in useCalendarEvents
-
-Since IndexedDB is async, `useCalendarEvents` starts with an empty array and loads records in a `useEffect`:
-
-```typescript
-const [records, setRecords] = useState<DailyRecord[]>([]);
-const isLoaded = useRef(false); // guards against saving empty state on mount
-
-useEffect(() => {
-  getStoredEvents().then(events => {
-    setRecords(events);
-    isLoaded.current = true;
-    setIsLoaded(true);
-  });
-}, []);
-```
-
-The `isLoaded` state (also returned from the hook) can be used to show a loading indicator while IndexedDB reads.
-
-**Note for developers**: If you clear the IndexedDB database (e.g., via Chrome DevTools > Application > IndexedDB), existing data will be lost. Re-sync from Google Drive if authenticated.
-
-## Storage Abstraction
-
-To support multiple storage vendors (e.g., Google Drive, Dropbox, OneDrive), LunaFlow uses a robust abstraction layer located in `src/storageProviders/`.
-
-1. **`RemoteStorageProvider` Interface**: A TypeScript interface that defines the required methods for any remote storage implementation (`id`, `name`, `initialize`, `signIn`, `signOut`, `fetchData`, `uploadData`, `restoreSession`, and an optional `handleCallback` for OAuth redirects).
-2. **`StorageProviderRegistry`**: A central registry that maps string IDs (e.g., `google-drive`) to their corresponding `RemoteStorageProvider` instances. This allows the application to dynamically resolve the active provider based on user settings.
-3. **`GoogleDriveProvider`**: The primary implementation of the `RemoteStorageProvider` interface, which wraps the `googleService.ts` transport layer.
-4. **`useRemoteSync` Hook**: This hook is entirely provider-agnostic. It accepts a `RemoteStorageProvider` instance (resolved from the registry in `CalendarApp.tsx`) and handles the high-level synchronization logic, such as:
-   - Conflict resolution (merging local and remote data).
-   - Auto-saving local changes to remote.
-   - Polling/Syncing on window focus.
-   - Session restoration.
-   - Triggering the provider's `handleCallback` method during initialization.
-
-This architecture allows for adding new storage providers without modifying the core synchronization logic or application structure. Simply create a new class implementing `RemoteStorageProviderInterface` and register it in the `StorageProviderRegistry`.
-
-## The Migration Pipeline
-
-The entry point for migration logic is `parseAndMigrateData(rawData)` in `src/services/storageService.ts`.
-
-It works sequentially based on an array of migration functions registered in `src/services/migrationService.ts`.
+Migration functions are registered in `src/store/migrationData.ts`:
 
 ```typescript
 const migrations: MigrationFunction[] = [
-  (data) => data, // Index 0 (unused)
-  migrateV1ToV2,  // Index 1: migrates FROM v1 TO v2
+  undefined, // Index 0 unused — versions start at 1
 ];
 ```
 
-The `parseAndMigrateData(rawData)` function:
-1. Detects the version of `rawData`. Legacy flat arrays are considered `ver: 1`.
-2. Extracts the records array from the envelope (if `ver > 1`).
-3. Uses a `while` loop to pass the **data array only** through every migration function starting from `currentVer` up to `STORAGE_CURRENT_VERSION`. 
-4. Returns a clean array of `DailyRecord[]` and a `wasMigrated` flag.
+To add version N:
+1. Bump `STORAGE_CURRENT_VERSION` in `src/constants.ts`
+2. Write `migrateVNtoVN+1(records)` in `migrationData.ts`
+3. Register at the correct index
+4. Update `DailyRecord` in `src/types.ts`
 
-**Key benefit:** Migration functions are pure data transformations. They don't need to know about the storage envelope or update the version number manually; the orchestrator handles that by incrementing the version after each successful function execution.
+IndexedDB always stores plain `DailyRecord[]` — never needs migration on read.
 
-## How to add a new version in the future
+---
 
-If we need to change the schema again (e.g., to version 3):
+## Adding a new storage provider
 
-1. **Update Constants**: 
-   In `src/constants.ts`, bump `STORAGE_CURRENT_VERSION = 3`.
-2. **Write the Migration**:
-   In `src/services/migrationService.ts`, write a new function `migrateV2ToV3(records: DailyRecord[])`. It should accept the array of records and return the transformed array.
-   *If no structural changes are needed, you can use the `migrateVersionNumber` identity function.*
-3. **Register the Migration**:
-   Add the new function to the `migrations` array at index `2`.
-4. **Update Types**:
-   Update `DailyRecord` in `src/types.ts` to reflect the v3 changes.
-
-Because data fetched from both `localStorage` and Google Drive passes through `parseAndMigrateData`, the application will automatically update the data everywhere upon load and subsequent sync.
+1. Implement `RemoteStorageProvider` interface in `src/storageProviders/`
+2. Create a matching `AuthProvider` (or extend `GoogleAuthProvider` if reusable)
+3. Register descriptor in `CalendarApp`: `registry.registerProvider({ id: '...', name: '...' })`
+4. Handle provider switch in `CalendarApp.handleProviderChange()`
+5. No changes needed to `DataStore`, `RecordsStore`, or any hook
