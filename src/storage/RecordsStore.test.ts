@@ -4,8 +4,10 @@ import type { DailyRecord } from './DailyRecord';
 import { STORAGE_CURRENT_VERSION } from '../constants';
 
 vi.mock('./indexedDBStorage', () => ({
-  readDailyRecords: vi.fn(async () => null),
-  writeDailyRecords: vi.fn(async () => { }),
+  openDB: vi.fn(async () => { }),
+  read: vi.fn(async () => null),
+  write: vi.fn(async () => { }),
+  closeDB: vi.fn(async () => { }),
 }));
 
 const { providerMock } = vi.hoisted(() => ({
@@ -88,9 +90,9 @@ describe('RecordsStore', () => {
   describe('loadLocal()', () => {
     it('reads from IndexedDB', async () => {
       const records = [makePeriodRecord('2024-01-01')];
-      vi.mocked(idb.readDailyRecords).mockResolvedValue(records);
+      vi.mocked(idb.read).mockResolvedValue(records);
       const result = await (recordsStore as { loadLocal(): Promise<DailyRecord[]> }).loadLocal();
-      expect(idb.readDailyRecords).toHaveBeenCalled();
+      expect(idb.read).toHaveBeenCalledWith('lunaflow', 'appData', 'events');
       expect(result).toEqual(records);
     });
   });
@@ -99,7 +101,7 @@ describe('RecordsStore', () => {
     it('writes to IndexedDB', async () => {
       const records = [makePeriodRecord('2024-01-01')];
       await recordsStore.save(records);
-      expect(idb.writeDailyRecords).toHaveBeenCalledWith(records);
+      expect(idb.write).toHaveBeenCalledWith('lunaflow', 'appData', 'events', records);
     });
   });
 

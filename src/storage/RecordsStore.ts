@@ -10,9 +10,13 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     return 'lunaflow_data';
   }
 
+  private readonly DB_NAME = 'lunaflow';
+  private readonly STORE_NAME = 'appData';
+  private readonly STORE_KEY = 'events';
+
   protected async loadLocal(): Promise<DailyRecord[] | null> {
     try {
-      return (await idb.readDailyRecords()) ?? [];
+      return ((await idb.read(this.DB_NAME, this.STORE_NAME, this.STORE_KEY)) as DailyRecord[] | null) ?? [];
     } catch (e) {
       console.error('Failed to load from IndexedDB', e);
       return [];
@@ -21,7 +25,7 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
 
   protected async saveLocal(data: DailyRecord[]): Promise<void> {
     try {
-      await idb.writeDailyRecords(data);
+      await idb.write(this.DB_NAME, this.STORE_NAME, this.STORE_KEY, data);
     } catch (e) {
       console.error('Failed to save to IndexedDB', e);
     }
@@ -70,6 +74,16 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     }
 
     return { records, wasMigrated: initialVer < currentVer };
+  }
+
+  override init(): void {
+    idb.openDB(this.DB_NAME, this.STORE_NAME);
+    super.init();
+  }
+
+  override destroy(): void {
+    super.destroy();
+    idb.closeDB(this.DB_NAME, this.STORE_NAME);
   }
 
   // Derived views for UI

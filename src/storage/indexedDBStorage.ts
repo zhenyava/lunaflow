@@ -1,35 +1,46 @@
-import type { DailyRecord } from './DailyRecord';
+const dbCache = new Map<string, Promise<IDBDatabase>>();
 
-const DB_NAME = 'lunaflow';
-const STORE_NAME = 'appData';
-const STORE_KEY = 'events';
+export const openDB = (dbName: string, storeName: string): Promise<IDBDatabase> => {
+  const cacheKey = `${dbName}:${storeName}`;
+  if (!dbCache.has(cacheKey)) {
+    dbCache.set(cacheKey, new Promise((resolve, reject) => {
+      const request = indexedDB.open(dbName);
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore(storeName);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    }));
+  }
+  return dbCache.get(cacheKey)!;
+};
 
-const openDB = (): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(STORE_NAME);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-
-export const readDailyRecords = async (): Promise<DailyRecord[] | null> => {
-  const db = await openDB();
+export const read = async (dbName: string, storeName: string, key: string): Promise<unknown> => {
+  const db = await openDB(dbName, storeName);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const request = tx.objectStore(STORE_NAME).get(STORE_KEY);
-    request.onsuccess = () => { db.close(); resolve(request.result ?? null); };
-    request.onerror = () => { db.close(); reject(request.error); };
+    const tx = db.transaction(storeName, 'readonly');
+    const request = tx.objectStore(storeName).get(key);
+    request.onsuccess = () => resolve(request.result ?? null);
+    request.onerror = () => reject(request.error);
   });
 };
 
-export const writeDailyRecords = async (records: DailyRecord[]): Promise<void> => {
-  const db = await openDB();
+export const write = async (dbName: string, storeName: string, key: string, data: unknown): Promise<void> => {
+  const db = await openDB(dbName, storeName);
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const request = tx.objectStore(STORE_NAME).put(records, STORE_KEY);
-    request.onsuccess = () => { db.close(); resolve(); };
-    request.onerror = () => { db.close(); reject(request.error); };
+    const tx = db.transaction(storeName, 'readwrite');
+    const request = tx.objectStore(storeName).put(data, key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
   });
+};
+
+export const closeDB = async (dbName: string, storeName: string): Promise<void> => {
+  const cacheKey = `${dbName}:${storeName}`;
+  const dbPromise = dbCache.get(cacheKey);
+  if (dbPromise) {
+    const db = await dbPromise;
+    db.close();
+    dbCache.delete(cacheKey);
+  }
 };
