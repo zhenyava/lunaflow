@@ -71,8 +71,9 @@ export abstract class DataStore<T> {
         this._cloudState = 'synced';
         this.notify();
       }
-    } catch (error) {
-      await this.handleSyncError(error);
+    } catch {
+      this._cloudState = 'unsynced';
+      this.notify();
     }
   }
 
@@ -133,18 +134,10 @@ export abstract class DataStore<T> {
 
         this._cloudState = 'synced';
         this.notify();
-      } catch (error) {
-        await this.handleSyncError(error);
+      } catch {
+        this._cloudState = 'unsynced';
+        this.notify();
       }
     }, 2000);
-  }
-
-  private async handleSyncError(error: unknown): Promise<void> {
-    this._cloudState = 'unsynced';
-    const err = error as { status?: number; message?: string };
-    if (err.status === 401 || err.message === 'Unauthorized') {
-      this._remoteStorageProvider = null;
-    }
-    this.notify();
   }
 }
