@@ -91,17 +91,6 @@ describe('RecordsStore', () => {
     });
   });
 
-  describe('isLoaded', () => {
-    it('returns false when data is null', () => {
-      expect(recordsStore.isLoaded).toBe(false);
-    });
-
-    it('returns true after save', async () => {
-      await recordsStore.save([]);
-      expect(recordsStore.isLoaded).toBe(true);
-    });
-  });
-
   describe('loadLocal()', () => {
     it('reads from IndexedDB', async () => {
       const records = [makePeriodRecord('2024-01-01')];

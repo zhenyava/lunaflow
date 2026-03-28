@@ -88,12 +88,8 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     return this._events;
   }
 
-  get allRecords(): readonly DailyRecord[] {
-    return this.data ?? [];
-  }
-
-  get isLoaded(): boolean {
-    return this.data !== null;
+  get allRecords(): readonly DailyRecord[] | null {
+    return this.data;
   }
 }
 

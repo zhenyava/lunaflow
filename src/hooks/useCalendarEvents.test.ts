@@ -13,10 +13,7 @@ vi.mock('../store/RecordsStore', () => {
       return (this.data ?? []).filter((r: DailyRecord) => !r.isDeleted);
     },
     get allRecords() {
-      return this.data ?? [];
-    },
-    get isLoaded() {
-      return this.data !== null;
+      return this.data;
     },
     cloudState: 'unsynced' as const,
     fileId: null as string | null,
@@ -56,16 +53,6 @@ describe('useCalendarEvents', () => {
 
     const { result } = renderHook(() => useCalendarEvents(recordsStore));
     expect(result.current.events).toEqual(mockEvents);
-  });
-
-  it('reflects recordsStore.isLoaded', () => {
-    const { result } = renderHook(() => useCalendarEvents(recordsStore));
-    expect(result.current.isLoaded).toBe(false);
-
-    act(() => {
-      (recordsStore as { data: DailyRecord[] | null }).data = [];
-    });
-    // isLoaded re-reads from store — need a notify to trigger re-render
   });
 
   describe('handleDayClick', () => {

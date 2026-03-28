@@ -9,7 +9,7 @@ export function useCalendarEvents(store: RecordsStore) {
   const handleDayClick = useCallback((date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const now = Date.now();
-    const prev = store.allRecords;
+    const prev = store.allRecords ?? [];
     const existingIdx = prev.findIndex(e => e.date === dateStr);
     const existing = existingIdx >= 0 ? prev[existingIdx] : null;
 
@@ -54,7 +54,7 @@ export function useCalendarEvents(store: RecordsStore) {
   }, [activeType, store]);
 
   const updateRecord = useCallback((dateStr: string, updates: Partial<DailyRecord>) => {
-    const prev = store.allRecords;
+    const prev = store.allRecords ?? [];
     const existingIdx = prev.findIndex(e => e.date === dateStr);
     const now = Date.now();
 
@@ -94,7 +94,6 @@ export function useCalendarEvents(store: RecordsStore) {
 
   return {
     events: store.events,
-    isLoaded: store.isLoaded,
     activeType,
     setActiveType,
     handleDayClick,
