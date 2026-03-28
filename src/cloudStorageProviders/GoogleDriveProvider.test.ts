@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GoogleDriveProvider } from './GoogleDriveProvider';
 import { runProviderComplianceTests } from './providerComplianceTests';
-import { CLOUD_STORAGE_FILENAME, CLOUD_STORAGE_FOLDER_NAME } from '../constants';
 
 interface MockGapiResult<T = unknown> {
   result: T;
@@ -45,20 +44,20 @@ describe('GoogleDriveProvider', () => {
   });
 
   describe('Drive API Operations', () => {
-    const FILE_ID = 'test-file-id';
+    const CLOUD_PATH = 'LunaFlow/lunaflow_data.json';
 
     it('should ensure drive file exists (found existing)', async () => {
       // 1. Mock finding the folder
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
-        result: { files: [{ id: 'folder-id', name: CLOUD_STORAGE_FOLDER_NAME }] }
+        result: { files: [{ id: 'folder-id', name: 'LunaFlow' }] }
       } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
 
       // 2. Mock finding the file
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
-        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+        result: { files: [{ id: 'drive-file-id', name: 'lunaflow_data.json' }] }
       } as MockGapiResult<{ files: { id: string; name: string; }[] }>);
 
-      const ok = await provider.ensureFileExists(FILE_ID);
+      const ok = await provider.ensureFileExists(CLOUD_PATH);
       expect(ok).toBe(true);
       expect(mockGetToken).toHaveBeenCalled();
     });
@@ -85,7 +84,7 @@ describe('GoogleDriveProvider', () => {
         json: async () => ({ id: 'new-file-id' })
       } as Response);
 
-      const ok = await provider.ensureFileExists(FILE_ID);
+      const ok = await provider.ensureFileExists(CLOUD_PATH);
       expect(ok).toBe(true);
       expect(window.gapi.client.drive.files.create).toHaveBeenCalled();
       expect(fetch).toHaveBeenCalledWith(
@@ -97,16 +96,16 @@ describe('GoogleDriveProvider', () => {
     it('should fetch data from drive', async () => {
       // We must call ensureFileExists first to populate _driveFileIds
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
-        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+        result: { files: [{ id: 'drive-file-id', name: 'lunaflow_data.json' }] }
       } as MockGapiResult<{ files: { id: string; name: string }[] }>);
-      await provider.ensureFileExists(FILE_ID);
+      await provider.ensureFileExists(CLOUD_PATH);
 
       const mockData = { records: [] };
       vi.mocked(window.gapi.client.drive.files.get).mockResolvedValue({
         result: mockData
       } as MockGapiResult);
 
-      const data = await provider.fetchData(FILE_ID);
+      const data = await provider.fetchData(CLOUD_PATH);
       expect(data).toBe(mockData);
       expect(window.gapi.client.drive.files.get).toHaveBeenCalledWith({
         fileId: 'drive-file-id',
@@ -117,14 +116,14 @@ describe('GoogleDriveProvider', () => {
     it('should upload data to drive', async () => {
       // Populate _driveFileIds
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
-        result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
+        result: { files: [{ id: 'drive-file-id', name: 'lunaflow_data.json' }] }
       } as MockGapiResult<{ files: { id: string; name: string }[] }>);
-      await provider.ensureFileExists(FILE_ID);
+      await provider.ensureFileExists(CLOUD_PATH);
 
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
       const data = { foo: 'bar' };
-      await provider.uploadData(FILE_ID, data);
+      await provider.uploadData(CLOUD_PATH, data);
 
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('https://www.googleapis.com/upload/drive/v3/files/drive-file-id'),
@@ -137,7 +136,7 @@ describe('GoogleDriveProvider', () => {
 
     it('should return false if ensureFileExists fails', async () => {
       vi.mocked(window.gapi.client.drive.files.list).mockRejectedValue(new Error('Network error'));
-      const ok = await provider.ensureFileExists(FILE_ID);
+      const ok = await provider.ensureFileExists(CLOUD_PATH);
       expect(ok).toBe(false);
     });
   });

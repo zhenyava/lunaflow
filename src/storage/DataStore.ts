@@ -14,8 +14,8 @@ export abstract class DataStore<T> {
   private _stateListeners = new Set<() => void>();
   private _uploadTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Abstract: subclasses define their stable logical file identifier ---
-  abstract get fileId(): string;
+  // --- Abstract: subclasses define their cloud storage path ---
+  abstract get cloudPath(): string;
 
   // --- Abstract: local persistence ---
   protected abstract loadLocal(): Promise<T | null>;
@@ -23,7 +23,7 @@ export abstract class DataStore<T> {
 
   // --- Abstract: sync ---
   protected abstract merge(local: T, cloud: T): T;
-  protected abstract fetchFromCloud(fileId: string): Promise<T>;
+  protected abstract fetchFromCloud(cloudPath: string): Promise<T>;
   protected abstract prepareDataToCloud(data: T): unknown;
 
   // --- Public state ---
@@ -73,7 +73,7 @@ export abstract class DataStore<T> {
     this.setCloudState('syncing');
 
     try {
-      const cloud = await this.fetchFromCloud(this.fileId);
+      const cloud = await this.fetchFromCloud(this.cloudPath);
       const local = this.data as T;
       const merged = this.merge(local, cloud);
 
@@ -95,7 +95,7 @@ export abstract class DataStore<T> {
 
   async connectCloud(provider: CloudStorageProvider): Promise<void> {
     this._cloudStorageProvider = provider;
-    const ok = await provider.ensureFileExists(this.fileId);
+    const ok = await provider.ensureFileExists(this.cloudPath);
     if (!ok) {
       this._cloudStorageProvider = null;
       throw new Error('Failed to ensure cloud file exists');
@@ -142,7 +142,7 @@ export abstract class DataStore<T> {
       this.setCloudState('uploading');
       try {
         const payload = this.prepareDataToCloud(data);
-        await this._cloudStorageProvider.uploadData(this.fileId, payload);
+        await this._cloudStorageProvider.uploadData(this.cloudPath, payload);
         this.setCloudState('synced');
       } catch {
         this.setCloudState('unsynced');

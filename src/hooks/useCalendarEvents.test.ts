@@ -14,7 +14,7 @@ const recordsStore = {
     return this.data;
   },
   cloudState: 'unsynced' as const,
-  fileId: null as string | null,
+  cloudPath: null as string | null,
   save: vi.fn(async function(records: DailyRecord[]) {
     recordsStore.data = records;
     listeners.forEach(fn => fn());

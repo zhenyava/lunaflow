@@ -1,5 +1,5 @@
-import { CLOUD_STORAGE_FILENAME, CLOUD_STORAGE_FOLDER_NAME } from '../constants';
 import type { CloudStorageProvider } from './CloudStorageProviderInterface';
+import { parseCloudPath } from './CloudStorageProviderInterface';
 
 interface GapiFileResult<T = unknown> {
   result: T;
@@ -8,7 +8,7 @@ interface GapiFileResult<T = unknown> {
 /**
  * Google Drive implementation of CloudStorageProvider.
  * Pure storage — no auth logic. Receives a token getter via constructor injection.
- * Maps logical fileIds (defined by DataStore) to Google Drive internal file IDs.
+ * Maps cloud paths to Google Drive internal file IDs.
  */
 export class GoogleDriveProvider implements CloudStorageProvider {
   readonly id = 'google-drive';
@@ -20,15 +20,16 @@ export class GoogleDriveProvider implements CloudStorageProvider {
     this._getToken = getToken;
   }
 
-  async ensureFileExists(fileId: string): Promise<boolean> {
+  async ensureFileExists(path: string): Promise<boolean> {
     try {
       const token = await this._getToken();
+      const [folderName, fileName] = parseCloudPath(path);
 
-      // 1. Find or create the LunaFlow folder
+      // 1. Find or create the folder
       let folderId = '';
       const folderResponse: GapiFileResult<{ files: Array<{ id: string; name: string }> }> =
         await window.gapi.client.drive.files.list({
-          q: `name = '${CLOUD_STORAGE_FOLDER_NAME}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+          q: `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
           fields: 'files(id, name)',
           spaces: 'drive',
         });
@@ -39,7 +40,7 @@ export class GoogleDriveProvider implements CloudStorageProvider {
       } else {
         const createFolderResponse: GapiFileResult<{ id: string }> =
           await window.gapi.client.drive.files.create({
-            resource: { name: CLOUD_STORAGE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder' },
+            resource: { name: folderName, mimeType: 'application/vnd.google-apps.folder' },
             fields: 'id',
           });
         folderId = createFolderResponse.result.id;
@@ -50,19 +51,19 @@ export class GoogleDriveProvider implements CloudStorageProvider {
         await window.gapi.client.drive.files.list({
           spaces: 'drive',
           fields: 'files(id, name)',
-          q: `name = '${CLOUD_STORAGE_FILENAME}' and '${folderId}' in parents and trashed = false`,
+          q: `name = '${fileName}' and '${folderId}' in parents and trashed = false`,
           pageSize: 1,
         });
 
       const files = response.result.files;
       if (files && files.length > 0) {
-        this._driveFileIds.set(fileId, files[0].id);
+        this._driveFileIds.set(path, files[0].id);
         return true;
       }
 
       // 3. Create file in the folder
       const metadata = {
-        name: CLOUD_STORAGE_FILENAME,
+        name: fileName,
         parents: [folderId],
         mimeType: 'application/json',
       };
@@ -85,7 +86,7 @@ export class GoogleDriveProvider implements CloudStorageProvider {
       }
 
       const result = await createResponse.json();
-      this._driveFileIds.set(fileId, result.id);
+      this._driveFileIds.set(path, result.id);
       return true;
     } catch (error) {
       console.error('Error ensuring drive file exists:', error);
@@ -93,10 +94,10 @@ export class GoogleDriveProvider implements CloudStorageProvider {
     }
   }
 
-  async fetchData(fileId: string): Promise<unknown> {
+  async fetchData(path: string): Promise<unknown> {
     try {
       await this._getToken();
-      const driveId = this._driveFileIds.get(fileId)!;
+      const driveId = this._driveFileIds.get(path)!;
       const fileResponse: GapiFileResult<unknown> = await window.gapi.client.drive.files.get({
         fileId: driveId,
         alt: 'media',
@@ -108,9 +109,9 @@ export class GoogleDriveProvider implements CloudStorageProvider {
     }
   }
 
-  async uploadData(fileId: string, data: unknown): Promise<void> {
+  async uploadData(path: string, data: unknown): Promise<void> {
     const token = await this._getToken();
-    const driveId = this._driveFileIds.get(fileId)!;
+    const driveId = this._driveFileIds.get(path)!;
 
     try {
       const response = await fetch(

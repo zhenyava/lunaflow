@@ -35,11 +35,11 @@ Pure storage — no auth knowledge. Receives a `getToken` function via construct
 new GoogleDriveProvider(() => authProvider.getToken())
 ```
 
-- `ensureFileExists(fileId: string): Promise<boolean>` — finds or creates the LunaFlow folder + file on Drive; maps logical `fileId` → Drive internal file ID internally
-- `fetchData(fileId)` — calls `getToken()` to ensure GAPI is ready, then fetches from Drive
-- `uploadData(fileId, data)` — calls `getToken()`, then PATCHes to Drive
+- `ensureFileExists(path: string): Promise<boolean>` — parses `path` into folder + filename, finds or creates them on Drive; maps `path` → Drive internal file ID internally
+- `fetchData(path)` — calls `getToken()` to ensure GAPI is ready, then fetches from Drive
+- `uploadData(path, data)` — calls `getToken()`, then PATCHes to Drive
 
-The logical `fileId` (e.g. `'lunaflow_data'`) is defined by `DataStore`. `GoogleDriveProvider` maps it to the real Drive file ID in a private `Map<string, string>`.
+The `path` (e.g. `'LunaFlow/lunaflow_data.json'`) is defined by `DataStore.cloudPath`. `GoogleDriveProvider` parses it into folder and filename, then maps the path to the real Drive file ID in a private `Map<string, string>`.
 
 **No singleton export.** Instance created lazily inside `CalendarApp` init effect when user is authenticated.
 
@@ -52,20 +52,20 @@ Abstract base class (plain TypeScript, no React) that handles:
 - **Cache-first load**: `init()` reads local data immediately so UI renders before auth completes
 - **`save(data)`**: writes to IndexedDB, schedules a debounced upload (2 s) to cloud
 - **`forceSync()`**: fetch → merge → upload cycle; sets `cloudState` throughout
-- **`connectCloud(provider)`**: sets the provider, calls `provider.ensureFileExists(this.fileId)`, triggers `forceSync()`
+- **`connectCloud(provider)`**: sets the provider, calls `provider.ensureFileExists(this.cloudPath)`, triggers `forceSync()`
 - **`disconnectCloud()`**: clears provider, resets `cloudState` to `'unsynced'`
-- **`fileId`**: abstract getter — subclasses define their stable logical file key
+- **`cloudPath`**: abstract getter — subclasses define their cloud storage path (e.g. `'LunaFlow/lunaflow_data.json'`)
 - **Subscriber pattern**: `subscribeDataChanged(fn)` / `subscribeCloudSyncStateChanged(fn)` for React re-renders
 
 Abstract methods subclasses must implement:
 
 ```typescript
-abstract get fileId(): string;
+abstract get cloudPath(): string;
 protected abstract loadLocal(): Promise<T | null>;
 protected abstract saveLocal(data: T): Promise<void>;
 protected abstract merge(local: T, cloud: T): T;
-protected abstract fetchFromCloud(fileId: string): Promise<T>;
-protected abstract prepareDataToCloud(fileId: string, data: T): unknown;
+protected abstract fetchFromCloud(cloudPath: string): Promise<T>;
+protected abstract prepareDataToCloud(data: T): unknown;
 ```
 
 ---
@@ -73,7 +73,7 @@ protected abstract prepareDataToCloud(fileId: string, data: T): unknown;
 ### `RecordsStore` (`src/storage/`)
 
 Concrete `DataStore<DailyRecord[]>`:
-- `get fileId()` returns `'lunaflow_data'` — the stable logical key
+- `get cloudPath()` returns `'LunaFlow/lunaflow_data.json'` — the cloud storage path (folder + filename)
 - `loadLocal()` — reads from IndexedDB, validates each record via `validateDailyRecords()` (invalid records are dropped)
 - `saveLocal()` — writes `DailyRecord[]` to IndexedDB
 - `merge()` — last-write-wins by `updatedAt`

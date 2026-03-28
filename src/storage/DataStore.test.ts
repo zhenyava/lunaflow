@@ -12,12 +12,12 @@ class TestStore extends DataStore<DailyRecord[]> {
   fetchFromCloudMock = vi.fn(async (): Promise<DailyRecord[]> => []);
   prepareDataToCloudMock = vi.fn((data: DailyRecord[]) => ({ ver: 1, records: data }));
 
-  get fileId() { return 'test-file-id'; }
+  get cloudPath() { return 'TestFolder/test.json'; }
 
   protected loadLocal() { return this.loadLocalMock(); }
   protected saveLocal(data: DailyRecord[]) { return this.saveLocalMock(data); }
   protected merge(local: DailyRecord[], cloud: DailyRecord[]) { return this.mergeMock(local, cloud); }
-  protected fetchFromCloud(fileId: string) { return this.fetchFromCloudMock(fileId); }
+  protected fetchFromCloud(cloudPath: string) { return this.fetchFromCloudMock(cloudPath); }
   protected prepareDataToCloud(data: DailyRecord[]) { return this.prepareDataToCloudMock(data); }
 
   // Expose internals for testing
@@ -84,7 +84,7 @@ describe('DataStore', () => {
 
       expect(providerMock.uploadData).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(2000);
-      expect(providerMock.uploadData).toHaveBeenCalledWith('test-file-id', expect.any(Object));
+      expect(providerMock.uploadData).toHaveBeenCalledWith('TestFolder/test.json', expect.any(Object));
     });
 
     it('does not upload if no provider is connected', async () => {
@@ -105,7 +105,7 @@ describe('DataStore', () => {
 
       await vi.advanceTimersByTimeAsync(2000);
       expect(providerMock.uploadData).toHaveBeenCalledOnce();
-      expect(providerMock.uploadData).toHaveBeenCalledWith('test-file-id', { ver: 1, records: second });
+      expect(providerMock.uploadData).toHaveBeenCalledWith('TestFolder/test.json', { ver: 1, records: second });
     });
   });
 

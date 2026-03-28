@@ -2,14 +2,14 @@ import type { DailyRecord } from './DailyRecord';
 import { validateDailyRecords } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
 import { parseStorageEnvelope } from './StorageEnvelope';
-import { STORAGE_CURRENT_VERSION } from '../constants';
+import { STORAGE_CURRENT_VERSION, CLOUD_STORAGE_FOLDER_NAME, CLOUD_STORAGE_FILENAME } from '../constants';
 import * as idb from './indexedDBStorage';
 import { migrations } from './migrationData';
 import { DataStore } from './DataStore';
 
 export class RecordsStore extends DataStore<DailyRecord[]> {
-  get fileId(): string {
-    return 'lunaflow_data';
+  get cloudPath(): string {
+    return `${CLOUD_STORAGE_FOLDER_NAME}/${CLOUD_STORAGE_FILENAME}`;
   }
 
   private readonly DB_NAME = 'lunaflow';
@@ -47,9 +47,9 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  protected async fetchFromCloud(fileId: string): Promise<DailyRecord[]> {
+  protected async fetchFromCloud(cloudPath: string): Promise<DailyRecord[]> {
     if (!this._cloudStorageProvider) throw new Error('No storage provider');
-    const raw = await this._cloudStorageProvider.fetchData(fileId);
+    const raw = await this._cloudStorageProvider.fetchData(cloudPath);
     const envelope = parseStorageEnvelope(raw);
     if (!envelope) return [];
     return this.migrateData(envelope).records;
