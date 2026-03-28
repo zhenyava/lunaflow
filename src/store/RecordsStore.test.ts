@@ -74,10 +74,10 @@ describe('RecordsStore', () => {
       expect(recordsStore.events).toEqual([]);
     });
 
-    it('filters out deleted records', () => {
+    it('filters out deleted records', async () => {
       const active = makePeriodRecord('2024-01-01');
       const deleted: DailyRecord = { date: '2024-01-02', updatedAt: Date.now(), isDeleted: true };
-      (recordsStore as { data: DailyRecord[] | null }).data = [active, deleted];
+      await recordsStore.save([active, deleted]);
       expect(recordsStore.events).toEqual([active]);
     });
   });
@@ -158,11 +158,4 @@ describe('RecordsStore', () => {
     });
   });
 
-  describe('prepareDataToCloud()', () => {
-    it('wraps data in versioned envelope before uploading', () => {
-      const records = [makePeriodRecord('2024-01-01')];
-      const result = (recordsStore as unknown as { prepareDataToCloud(d: DailyRecord[]): any }).prepareDataToCloud(records);
-      expect(result).toEqual({ ver: STORAGE_CURRENT_VERSION, records });
-    });
-  });
 });

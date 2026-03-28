@@ -6,7 +6,7 @@ import type { DailyRecord } from '../types';
 
 interface CalendarMonthProps {
   month: Date;
-  events?: DailyRecord[];
+  events?: readonly DailyRecord[];
   predictedDates?: Set<string>;
   predictedOvulationDates?: Set<string>;
   onDayClick?: (date: Date) => void;

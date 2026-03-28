@@ -1,8 +1,9 @@
+import { useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, RefreshCw, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import type { EventType } from '../types';
 import type { ProviderDescriptor } from '../storageProviders/StorageProviderRegistry';
-import type { CloudState } from '../store/DataStore';
+import type { RecordsStore } from '../store/RecordsStore';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
     avgCycleLength: number | null;
@@ -10,7 +11,8 @@ interface HeaderProps {
     activeType: EventType;
     setActiveType: (type: EventType) => void;
     isAuthenticated: boolean;
-    syncState: CloudState;
+    recordsStore: RecordsStore;
+    isOnline: boolean;
     onSync: () => void;
     onLogin: () => void;
 
@@ -61,7 +63,8 @@ export default function Header({
     activeType,
     setActiveType,
     isAuthenticated,
-    syncState,
+    recordsStore,
+    isOnline,
     onSync,
     onLogin,
     isSettingsOpen,
@@ -77,9 +80,12 @@ export default function Header({
     onNextYear
 }: HeaderProps) {
     const navigate = useNavigate();
+    const [, rerender] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => recordsStore.subscribeCloudSyncStateChanged(rerender), [recordsStore]);
+    const syncState = isOnline ? recordsStore.cloudState : 'offline';
 
     const getSyncIcon = () => {
-        if (syncState === 'unsynced') {
+        if (syncState === 'offline') {
             return <WifiOff size={20} className="text-amber-500" />;
         }
         if (syncState === 'uploading' || syncState === 'syncing') {

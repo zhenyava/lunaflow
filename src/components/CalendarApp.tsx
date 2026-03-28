@@ -27,7 +27,7 @@ function CalendarApp() {
   }, []);
   const recordsStore = useMemo(() => new RecordsStore(), []);
 
-  // React bridge: re-render when store or auth changes
+  // React bridge: re-render when data changes
   const [, rerender] = useReducer((x: number) => x + 1, 0);
 
   // Lifecycle: init store, initialize auth, connect remote if authenticated
@@ -45,7 +45,7 @@ function CalendarApp() {
       }
     });
 
-    const unsubStore = recordsStore.subscribe(rerender);
+    const unsubStore = recordsStore.subscribeDataChanged(rerender);
     const unsubAuth = authProvider.onAuthStateChange(() => rerender());
     const unsubRegistry = registry.subscribe(rerender);
 
@@ -78,7 +78,6 @@ function CalendarApp() {
   }, [authProvider, recordsStore, registry]);
 
   const isAuthenticated = authProvider.isAuthenticated();
-  const cloudState = recordsStore.cloudState;
   const selectedProviderId = registry.activeProviderId;
   const allProviders = registry.getAllProviders();
 
@@ -176,7 +175,8 @@ function CalendarApp() {
         activeType={activeType}
         setActiveType={setActiveType}
         isAuthenticated={isAuthenticated}
-        syncState={isOnline ? cloudState : 'unsynced'}
+        recordsStore={recordsStore}
+        isOnline={isOnline}
         onSync={() => isAuthenticated && forceSync()}
         onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}

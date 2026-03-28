@@ -10,7 +10,8 @@ export abstract class DataStore<T> {
   protected data: T | null = null;
   protected _remoteStorageProvider: RemoteStorageProvider | null = null;
   private _cloudState: CloudState = 'unsynced';
-  private _listeners = new Set<() => void>();
+  private _dataListeners = new Set<() => void>();
+  private _stateListeners = new Set<() => void>();
   private _uploadTimer: ReturnType<typeof setTimeout> | null = null;
 
   // --- Abstract: subclasses define their stable logical file identifier ---
@@ -33,28 +34,43 @@ export abstract class DataStore<T> {
 
   // --- Subscriber pattern ---
 
-  subscribe(fn: () => void): () => void {
-    this._listeners.add(fn);
-    return () => this._listeners.delete(fn);
+  subscribeDataChanged(fn: () => void): () => void {
+    this._dataListeners.add(fn);
+    return () => this._dataListeners.delete(fn);
   }
 
-  protected notify(): void {
-    this._listeners.forEach(fn => fn());
+  subscribeCloudSyncStateChanged(fn: () => void): () => void {
+    this._stateListeners.add(fn);
+    return () => this._stateListeners.delete(fn);
   }
+
+  // --- Private setters: combine assignment + notification ---
+
+  private setData(data: T): void {
+    this.data = data;
+    this.onDataChanged?.(data);
+    this._dataListeners.forEach(fn => fn());
+  }
+
+  private setCloudState(state: CloudState): void {
+    this._cloudState = state;
+    this._stateListeners.forEach(fn => fn());
+  }
+
+  // Optional hook for subclasses to react to data changes (e.g. update derived caches)
+  protected onDataChanged?(data: T): void;
 
   // --- Public API ---
 
   async save(data: T): Promise<void> {
-    this.data = data;
-    this.notify();
+    this.setData(data);
     await this.saveLocal(data);
     this.scheduleUpload(data);
   }
 
   async forceSync(): Promise<void> {
     if (!this._remoteStorageProvider || this._cloudState === 'uploading') return;
-    this._cloudState = 'syncing'
-    this.notify()
+    this.setCloudState('syncing');
 
     try {
       const remote = await this.fetchFromCloud(this.fileId);
@@ -62,18 +78,16 @@ export abstract class DataStore<T> {
       const merged = this.merge(local, remote);
 
       if (!eventsEqual(merged, local)) {
-        this.data = merged;
+        this.setData(merged);
         await this.saveLocal(merged);
       }
       if (!eventsEqual(merged, remote)) {
-        this.scheduleUpload(merged)
+        this.scheduleUpload(merged);
       } else {
-        this._cloudState = 'synced';
-        this.notify();
+        this.setCloudState('synced');
       }
     } catch {
-      this._cloudState = 'unsynced';
-      this.notify();
+      this.setCloudState('unsynced');
     }
   }
 
@@ -91,8 +105,7 @@ export abstract class DataStore<T> {
 
   disconnectRemote(): void {
     this._remoteStorageProvider = null;
-    this._cloudState = 'unsynced';
-    this.notify();
+    this.setCloudState('unsynced');
   }
 
   // --- Lifecycle ---
@@ -100,8 +113,7 @@ export abstract class DataStore<T> {
   init(): void {
     this.loadLocal().then(data => {
       if (data !== null) {
-        this.data = data;
-        this.notify();
+        this.setData(data);
       }
     });
   }
@@ -111,7 +123,8 @@ export abstract class DataStore<T> {
       clearTimeout(this._uploadTimer);
       this._uploadTimer = null;
     }
-    this._listeners.clear();
+    this._dataListeners.clear();
+    this._stateListeners.clear();
     this._remoteStorageProvider = null;
     this._cloudState = 'unsynced';
     this.data = null;
@@ -126,17 +139,13 @@ export abstract class DataStore<T> {
     this._uploadTimer = setTimeout(async () => {
       this._uploadTimer = null;
       if (!this._remoteStorageProvider) return;
-      this._cloudState = 'uploading';
-      this.notify();
+      this.setCloudState('uploading');
       try {
         const payload = this.prepareDataToCloud(data);
         await this._remoteStorageProvider.uploadData(this.fileId, payload);
-
-        this._cloudState = 'synced';
-        this.notify();
+        this.setCloudState('synced');
       } catch {
-        this._cloudState = 'unsynced';
-        this.notify();
+        this.setCloudState('unsynced');
       }
     }, 2000);
   }

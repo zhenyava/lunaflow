@@ -78,8 +78,14 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
 
   // Derived views for UI
 
+  private _events: readonly DailyRecord[] = [];
+
+  protected override onDataChanged(data: DailyRecord[]): void {
+    this._events = data.filter(r => !r.isDeleted);
+  }
+
   get events(): readonly DailyRecord[] {
-    return (this.data ?? []).filter(r => !r.isDeleted);
+    return this._events;
   }
 
   get allRecords(): readonly DailyRecord[] {

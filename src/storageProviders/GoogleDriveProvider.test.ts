@@ -67,7 +67,7 @@ describe('GoogleDriveProvider', () => {
       // 1. No folder found
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
         result: { files: [] }
-      } as MockGapiResult<{ files: any[] }>);
+      } as MockGapiResult<{ files: { id: string; name: string }[] }>);
 
       // 2. Mock folder creation
       vi.mocked(window.gapi.client.drive.files.create).mockResolvedValueOnce({
@@ -77,7 +77,7 @@ describe('GoogleDriveProvider', () => {
       // 3. No file found in folder
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValueOnce({
         result: { files: [] }
-      } as MockGapiResult<{ files: any[] }>);
+      } as MockGapiResult<{ files: { id: string; name: string }[] }>);
 
       // 4. Mock file creation via fetch upload
       vi.mocked(fetch).mockResolvedValueOnce({
@@ -98,7 +98,7 @@ describe('GoogleDriveProvider', () => {
       // We must call ensureFileExists first to populate _driveFileIds
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
         result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
-      } as MockGapiResult<{ files: any[] }>);
+      } as MockGapiResult<{ files: { id: string; name: string }[] }>);
       await provider.ensureFileExists(FILE_ID);
 
       const mockData = { records: [] };
@@ -118,7 +118,7 @@ describe('GoogleDriveProvider', () => {
       // Populate _driveFileIds
       vi.mocked(window.gapi.client.drive.files.list).mockResolvedValue({
         result: { files: [{ id: 'drive-file-id', name: CLOUD_STORAGE_FILENAME }] }
-      } as MockGapiResult<{ files: any[] }>);
+      } as MockGapiResult<{ files: { id: string; name: string }[] }>);
       await provider.ensureFileExists(FILE_ID);
 
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);

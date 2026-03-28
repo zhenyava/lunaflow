@@ -8,7 +8,7 @@ import {
     predictFutureOvulations
 } from '../services/statsService';
 
-export function useCycleStats(events: DailyRecord[], currentYear: number) {
+export function useCycleStats(events: readonly DailyRecord[], currentYear: number) {
   // 1. Calculate Averages
   const avgCycleLength = useMemo(() => calculateAverageCycleLength(events), [events]);
   const avgPeriodDuration = useMemo(() => calculateAverageDuration(events), [events]);

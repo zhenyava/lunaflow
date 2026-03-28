@@ -4,7 +4,7 @@ import CalendarMonth from './CalendarMonth';
 
 interface MobileCalendarViewProps {
     months: Date[];
-    events: DailyRecord[];
+    events: readonly DailyRecord[];
     predictedDates: Set<string>;
     predictedOvulationDates: Set<string>;
     onDayClick: (date: Date) => void;

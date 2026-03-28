@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataStore } from './DataStore';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord } from '../types';
+import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
 
 // Minimal concrete subclass for testing DataStore behavior
 class TestStore extends DataStore<DailyRecord[]> {
@@ -63,9 +64,9 @@ describe('DataStore', () => {
       expect(store.saveLocalMock).toHaveBeenCalledWith(records);
     });
 
-    it('notifies subscribers', async () => {
+    it('notifies data subscribers', async () => {
       const listener = vi.fn();
-      store.subscribe(listener);
+      store.subscribeDataChanged(listener);
       await store.save([]);
       expect(listener).toHaveBeenCalled();
     });
@@ -76,7 +77,7 @@ describe('DataStore', () => {
     });
 
     it('schedules debounced upload when provider is connected', async () => {
-      await store.connectRemote(providerMock as any);
+      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
       
       const records = [makePeriodRecord('2024-01-01')];
       await store.save(records);
@@ -93,7 +94,7 @@ describe('DataStore', () => {
     });
 
     it('cancels previous debounce timer when save is called again', async () => {
-      await store.connectRemote(providerMock as any);
+      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
 
       const first = [makePeriodRecord('2024-01-01')];
       const second = [makePeriodRecord('2024-01-02')];
@@ -110,7 +111,7 @@ describe('DataStore', () => {
 
   describe('forceSync()', () => {
     beforeEach(async () => {
-      await store.connectRemote(providerMock as any);
+      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
       providerMock.uploadData.mockClear(); // connectRemote calls forceSync, which might call upload
     });
 
@@ -164,16 +165,6 @@ describe('DataStore', () => {
       expect(store.cloudState).toBe('synced');
     });
 
-    it('calls onSyncError on 401 error', async () => {
-      const onSyncError = vi.fn();
-      store.onSyncError = onSyncError;
-      store.fetchFromCloudMock.mockRejectedValue({ status: 401 });
-      
-      await store.forceSync();
-      
-      expect(onSyncError).toHaveBeenCalled();
-    });
-
     it('resets cloudState to unsynced on error', async () => {
       store.fetchFromCloudMock.mockRejectedValue(new Error('Network error'));
       await store.forceSync();
@@ -182,18 +173,32 @@ describe('DataStore', () => {
   });
 
   describe('subscriber pattern', () => {
-    it('calls subscriber when save is called', async () => {
+    it('subscribeDataChanged fires on save', async () => {
       const fn = vi.fn();
-      store.subscribe(fn);
+      store.subscribeDataChanged(fn);
       await store.save([]);
       expect(fn).toHaveBeenCalled();
     });
 
-    it('unsubscribe stops notifications', async () => {
+    it('unsubscribe stops data notifications', async () => {
       const fn = vi.fn();
-      const unsub = store.subscribe(fn);
+      const unsub = store.subscribeDataChanged(fn);
       unsub();
       await store.save([]);
+      expect(fn).not.toHaveBeenCalled();
+    });
+
+    it('subscribeCloudSyncStateChanged fires on disconnectRemote', () => {
+      const fn = vi.fn();
+      store.subscribeCloudSyncStateChanged(fn);
+      store.disconnectRemote();
+      expect(fn).toHaveBeenCalled();
+    });
+
+    it('subscribeDataChanged does not fire on cloudState change', () => {
+      const fn = vi.fn();
+      store.subscribeDataChanged(fn);
+      store.disconnectRemote();
       expect(fn).not.toHaveBeenCalled();
     });
   });
@@ -204,7 +209,7 @@ describe('DataStore', () => {
       const freshStore = new TestStore();
       freshStore.loadLocalMock.mockResolvedValue(records);
       const listener = vi.fn();
-      freshStore.subscribe(listener);
+      freshStore.subscribeDataChanged(listener);
 
       freshStore.init();
       await vi.runAllTimersAsync();
