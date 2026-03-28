@@ -1,4 +1,5 @@
 import type { DailyRecord } from './DailyRecord';
+import type { StorageEnvelope } from './StorageEnvelope';
 import { STORAGE_CURRENT_VERSION } from '../constants';
 import * as idb from './indexedDBStorage';
 import { migrations } from './migrationData';
@@ -43,23 +44,18 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     return this.migrateData(raw).records;
   }
 
-  protected prepareDataToCloud(data: DailyRecord[]): unknown {
+  protected prepareDataToCloud(data: DailyRecord[]): StorageEnvelope {
     return { ver: STORAGE_CURRENT_VERSION, records: data };
   }
 
   private migrateData(parsedData: unknown): { records: DailyRecord[]; wasMigrated: boolean } {
-    if (!parsedData) return { records: [], wasMigrated: false };
-
-    let currentVer = 1;
-    let records: DailyRecord[];
-
-    if (typeof parsedData === 'object' && 'ver' in parsedData) {
-      const dataObj = parsedData as Record<string, unknown>;
-      currentVer = dataObj.ver as number;
-      records = dataObj.records as DailyRecord[];
-    } else {
+    if (!parsedData || typeof parsedData !== 'object' || !('ver' in parsedData)) {
       return { records: [], wasMigrated: false };
     }
+
+    const envelope = parsedData as StorageEnvelope;
+    let currentVer = envelope.ver;
+    let records = envelope.records;
 
     const initialVer = currentVer;
 

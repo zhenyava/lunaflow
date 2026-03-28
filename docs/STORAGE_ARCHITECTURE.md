@@ -5,7 +5,7 @@ This document outlines the architecture used to store, sync, and version data in
 ## Core Concepts
 
 1. **`DailyRecord`**: The single source of truth for a calendar day. All events (period, ovulation) are nested inside this single object.
-2. **Versioned Envelope**: Data on Google Drive is wrapped in an envelope containing a version number:
+2. **Versioned Envelope** (`StorageEnvelope` in `src/storage/StorageEnvelope.ts`): User data is wrapped in a versioned envelope for persistence and sync:
    ```json
    {
      "ver": 1,
