@@ -13,9 +13,6 @@ export abstract class DataStore<T> {
   private _listeners = new Set<() => void>();
   private _uploadTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Callback for CalendarApp to handle auth errors (e.g. call authProvider.signOut())
-  onSyncError: (() => void) | null = null;
-
   // --- Abstract: subclasses define their stable logical file identifier ---
   abstract get fileId(): string;
 
@@ -116,7 +113,6 @@ export abstract class DataStore<T> {
     this._listeners.clear();
     this._remoteStorageProvider = null;
     this._cloudState = 'unsynced';
-    this.onSyncError = null;
     this.data = null;
   }
 
@@ -148,7 +144,6 @@ export abstract class DataStore<T> {
     const err = error as { status?: number; message?: string };
     if (err.status === 401 || err.message === 'Unauthorized') {
       this._remoteStorageProvider = null;
-      this.onSyncError?.();
     }
     this.notify();
   }

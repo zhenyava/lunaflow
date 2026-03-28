@@ -25,11 +25,7 @@ function CalendarApp() {
     r.registerProvider({ id: 'google-drive', name: 'Google Drive' });
     return r;
   }, []);
-  const recordsStore = useMemo(() => {
-    const rs = new RecordsStore();
-    rs.onSyncError = () => { console.error('Sync failed: Unauthorized'); };
-    return rs;
-  }, []);
+  const recordsStore = useMemo(() => new RecordsStore(), []);
 
   // React bridge: re-render when store or auth changes
   const [, rerender] = useReducer((x: number) => x + 1, 0);

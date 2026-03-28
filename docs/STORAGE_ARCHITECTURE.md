@@ -82,7 +82,6 @@ Abstract base class (plain TypeScript, no React) that handles:
 - **`forceSync()`**: fetch → merge → upload cycle; sets `cloudState` throughout
 - **`connectRemote(provider)`**: sets the provider, calls `provider.ensureFileExists(this.fileId)`, triggers `forceSync()`
 - **`disconnectRemote()`**: clears provider, resets `cloudState` to `'unsynced'`
-- **`onSyncError`**: callback set by CalendarApp; called on 401 errors so CalendarApp can sign out
 - **`fileId`**: abstract getter — subclasses define their stable logical file key
 - **Subscriber pattern**: `subscribe(fn)` / `notify()` for React re-renders
 
@@ -132,7 +131,6 @@ Lifecycle `useEffect`:
 2. `authProvider.initialize()` — parse callback, load GAPI, restore token
 3. If authenticated → create `GoogleDriveProvider` lazily, call `recordsStore.connectRemote(provider)`
 4. Subscribe to store + auth + registry changes for React re-renders
-5. Set `recordsStore.onSyncError` → calls `authProvider.signOut()` on 401
 
 Owns browser env concerns: online/offline/focus listeners for `forceSync()`.
 
@@ -216,8 +214,7 @@ any sync error
   ├─► cloudState = 'unsynced'   (data is safe locally; next sync will retry)
   ├─► notify()
   └─► [if 401 / Unauthorized]
-          ├─► _remoteStorageProvider = null   (disconnects remote)
-          └─► onSyncError?.()                 (CalendarApp calls authProvider.signOut())
+          └─► _remoteStorageProvider = null   (disconnects remote; auth provider handles sign-out via its own state change)
 ```
 
 ### `cloudState` vs display state
