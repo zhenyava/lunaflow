@@ -167,6 +167,10 @@ These checks are sequential and must pass before a PR can be merged.
 - Use **React DevTools** for component state debugging
 - Check **Vite dev server** logs for build issues
 
+## Forbidden Patterns
+
+- **No singletons**: Never export singleton instances. All class instances are created via `useMemo` in `CalendarApp` and passed down as parameters. This keeps components testable and avoids hidden global state.
+
 ## Common Gotchas
 
 - **Date handling**: Always use `date-fns` for consistent date operations

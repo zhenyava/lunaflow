@@ -2,7 +2,18 @@
 
 ## Core Components
 
-### 1. Backend (Vercel Serverless Functions)
+### `GoogleAuthProvider` (`src/auth/`)
+
+Owns all OAuth concerns:
+- `initialize()` — parse OAuth redirect callback, load GAPI script, restore token from localStorage
+- `signIn()` / `signOut()` — redirect to `/api/auth/login`, call `/api/auth/logout`
+- `isAuthenticated()` — checks localStorage for a valid token
+- `getToken()` — returns a valid token, auto-refreshes via `/api/auth/refresh` if expired, syncs to GAPI client
+- `onAuthStateChange(fn)` — subscriber pattern; fires on sign-in/sign-out
+
+**No singleton export.** Instance created via `useMemo` in `CalendarApp`.
+
+### Backend (Vercel Serverless Functions)
 
 Located in `/api/auth/`, these functions handle the "secure" part of OAuth.
 
@@ -11,14 +22,14 @@ Located in `/api/auth/`, these functions handle the "secure" part of OAuth.
 - **`/api/auth/refresh`**: Decrypts the cookie and requests a new `access_token` from Google.
 - **`/api/auth/logout`**: Destroys the secure session.
 
-### 2. Session Management (`iron-session`)
+### Session Management (`iron-session`)
 
 We use `iron-session` to manage a stateless, encrypted, `HttpOnly` cookie named `lunaflow_auth_session`.
 
 - **Security**: The `refresh_token` is never sent to the frontend. It stays encrypted in the cookie, protected from XSS.
 - **Rolling Sessions**: The session is valid for 30 days. This timer is **reset** every time the user visits the app and a token refresh occurs (Scenario 2). This means the user only needs to re-authenticate if they are inactive for more than 30 consecutive days.
 
-### 3. Frontend Service (`googleService.ts`)
+### Frontend Service (`googleService.ts`)
 
 - **`ensureValidToken()`**: A proactive interceptor that checks the token TTL before every Google Drive API call.
 - **Proactive Refresh**: If the token is expired, it silently calls `/api/auth/refresh` to get a new one.
@@ -33,6 +44,22 @@ To prevent race conditions and network latency issues, we implement a **Backend-
 2. **Backend Subtraction**: The Vercel API subtracts a **30-second safety buffer** (`3600 - 30 = 3570`).
 3. **Frontend Calculation**: The frontend receives `expires_in: 3570` and calculates an absolute timestamp: `expiresAt = Date.now() + (3570 * 1000)`.
 4. **Validation**: The frontend strictly checks `Date.now() >= expiresAt`. Because of the buffer, the token is refreshed ~30 seconds *before* Google actually invalidates it.
+
+---
+
+## App Start Auth Flow
+
+```
+CalendarApp mounts
+  └─► authProvider.initialize()
+          ├─► handleCallback()  (parse OAuth redirect if present)
+          ├─► initGapi()        (load GAPI script + client.init)
+          └─► restoreGapiSession()
+                  │
+                  └─► [if isAuthenticated()]
+                          └─► new GoogleDriveProvider(getToken)
+                                  └─► recordsStore.connectCloud(provider)
+```
 
 ---
 

@@ -1,5 +1,7 @@
 import type { DailyRecord } from './DailyRecord';
+import { validateDailyRecords } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
+import { parseStorageEnvelope } from './StorageEnvelope';
 import { STORAGE_CURRENT_VERSION } from '../constants';
 import * as idb from './indexedDBStorage';
 import { migrations } from './migrationData';
@@ -16,7 +18,10 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
 
   protected async loadLocal(): Promise<DailyRecord[] | null> {
     try {
-      return ((await idb.read(this.DB_NAME, this.STORE_NAME, this.STORE_KEY)) as DailyRecord[] | null) ?? [];
+      const raw = await idb.read(this.DB_NAME, this.STORE_NAME, this.STORE_KEY);
+      if (raw === null) return [];
+      if (!Array.isArray(raw)) return [];
+      return validateDailyRecords(raw);
     } catch (e) {
       console.error('Failed to load from IndexedDB', e);
       return [];
@@ -45,19 +50,16 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
   protected async fetchFromCloud(fileId: string): Promise<DailyRecord[]> {
     if (!this._cloudStorageProvider) throw new Error('No storage provider');
     const raw = await this._cloudStorageProvider.fetchData(fileId);
-    return this.migrateData(raw).records;
+    const envelope = parseStorageEnvelope(raw);
+    if (!envelope) return [];
+    return this.migrateData(envelope).records;
   }
 
   protected prepareDataToCloud(data: DailyRecord[]): StorageEnvelope {
     return { ver: STORAGE_CURRENT_VERSION, records: data };
   }
 
-  private migrateData(parsedData: unknown): { records: DailyRecord[]; wasMigrated: boolean } {
-    if (!parsedData || typeof parsedData !== 'object' || !('ver' in parsedData)) {
-      return { records: [], wasMigrated: false };
-    }
-
-    const envelope = parsedData as StorageEnvelope;
+  private migrateData(envelope: StorageEnvelope): { records: DailyRecord[]; wasMigrated: boolean } {
     let currentVer = envelope.ver;
     let records = envelope.records;
 

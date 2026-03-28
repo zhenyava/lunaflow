@@ -27,7 +27,7 @@ import * as idb from './indexedDBStorage';
 
 describe('migrateData', () => {
   const rs = new RecordsStore() as unknown as {
-    migrateData(d: unknown): { records: DailyRecord[], wasMigrated: boolean }
+    migrateData(d: { ver: number; records: DailyRecord[] }): { records: DailyRecord[], wasMigrated: boolean }
   };
 
   beforeEach(() => {
@@ -43,14 +43,8 @@ describe('migrateData', () => {
     expect(records).toEqual(mockRecords);
   });
 
-  it('returns empty records for null input', () => {
-    const { records, wasMigrated } = rs.migrateData(null);
-    expect(records).toEqual([]);
-    expect(wasMigrated).toBe(false);
-  });
-
-  it('returns empty records for invalid format', () => {
-    const { records, wasMigrated } = rs.migrateData({ foo: 'bar' });
+  it('returns empty records without migration when ver >= current', () => {
+    const { records, wasMigrated } = rs.migrateData({ ver: STORAGE_CURRENT_VERSION, records: [] });
     expect(records).toEqual([]);
     expect(wasMigrated).toBe(false);
   });
@@ -133,13 +127,28 @@ describe('RecordsStore', () => {
   });
 
   describe('fetchFromCloud()', () => {
+    const fetchFromCloud = (store: RecordsStore) =>
+      (store as unknown as { fetchFromCloud(id: string): Promise<DailyRecord[]> }).fetchFromCloud('file-id');
+
     it('fetches from provider and migrates data', async () => {
       const record = makePeriodRecord('2024-01-01');
       const rawData = { ver: STORAGE_CURRENT_VERSION, records: [record] };
       vi.mocked(providerMock.fetchData).mockResolvedValue(rawData);
-      
-      const result = await (recordsStore as unknown as { fetchFromCloud(id: string): Promise<DailyRecord[]> }).fetchFromCloud('file-id');
+
+      const result = await fetchFromCloud(recordsStore);
       expect(result).toEqual([record]);
+    });
+
+    it('returns empty array for null cloud data', async () => {
+      vi.mocked(providerMock.fetchData).mockResolvedValue(null);
+      const result = await fetchFromCloud(recordsStore);
+      expect(result).toEqual([]);
+    });
+
+    it('returns empty array for invalid cloud data', async () => {
+      vi.mocked(providerMock.fetchData).mockResolvedValue({ foo: 'bar' });
+      const result = await fetchFromCloud(recordsStore);
+      expect(result).toEqual([]);
     });
   });
 

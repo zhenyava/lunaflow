@@ -73,3 +73,37 @@ export const makeOvulationRecord = (date: string, updatedAt = Date.now()): Daily
   updatedAt,
   ovulation: {}
 });
+
+// --- Schema validation ---
+
+import * as v from 'valibot';
+
+const FlowIntensitySchema = v.picklist(['light', 'medium', 'heavy', 'spotting']);
+
+export const DailyRecordSchema = v.object({
+  date: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date format')),
+  period: v.optional(v.object({ intensity: v.optional(FlowIntensitySchema) })),
+  ovulation: v.optional(
+    v.custom<Record<string, never>>((input) => typeof input === 'object' && input !== null && !Array.isArray(input))
+  ),
+  symptoms: v.optional(v.record(v.string(), v.array(v.string()))),
+  updatedAt: v.number(),
+  isDeleted: v.optional(v.boolean()),
+});
+
+/**
+ * Validates an array of unknown values, returning only the records that pass.
+ * Invalid records are dropped with a warning.
+ */
+export const validateDailyRecords = (data: unknown[]): DailyRecord[] => {
+  const valid: DailyRecord[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const result = v.safeParse(DailyRecordSchema, data[i]);
+    if (result.success) {
+      valid.push(result.output);
+    } else {
+      console.warn(`[LunaFlow] Dropped invalid record at index ${i}:`, result.issues);
+    }
+  }
+  return valid;
+};
