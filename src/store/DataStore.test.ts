@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataStore } from './DataStore';
 import type { DailyRecord } from '../types';
 import { makePeriodRecord } from '../types';
-import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
+import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 
 // Minimal concrete subclass for testing DataStore behavior
 class TestStore extends DataStore<DailyRecord[]> {
   loadLocalMock = vi.fn(async (): Promise<DailyRecord[] | null> => null);
   saveLocalMock = vi.fn(async (): Promise<void> => {});
-  mergeMock = vi.fn((local: DailyRecord[], remote: DailyRecord[]) => [...local, ...remote]);
+  mergeMock = vi.fn((local: DailyRecord[], cloud: DailyRecord[]) => [...local, ...cloud]);
   fetchFromCloudMock = vi.fn(async (): Promise<DailyRecord[]> => []);
   prepareDataToCloudMock = vi.fn((data: DailyRecord[]) => ({ ver: 1, records: data }));
 
@@ -16,7 +16,7 @@ class TestStore extends DataStore<DailyRecord[]> {
 
   protected loadLocal() { return this.loadLocalMock(); }
   protected saveLocal(data: DailyRecord[]) { return this.saveLocalMock(data); }
-  protected merge(local: DailyRecord[], remote: DailyRecord[]) { return this.mergeMock(local, remote); }
+  protected merge(local: DailyRecord[], cloud: DailyRecord[]) { return this.mergeMock(local, cloud); }
   protected fetchFromCloud(fileId: string) { return this.fetchFromCloudMock(fileId); }
   protected prepareDataToCloud(data: DailyRecord[]) { return this.prepareDataToCloudMock(data); }
 
@@ -77,8 +77,8 @@ describe('DataStore', () => {
     });
 
     it('schedules debounced upload when provider is connected', async () => {
-      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
-      
+      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
+
       const records = [makePeriodRecord('2024-01-01')];
       await store.save(records);
 
@@ -94,7 +94,7 @@ describe('DataStore', () => {
     });
 
     it('cancels previous debounce timer when save is called again', async () => {
-      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
+      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
 
       const first = [makePeriodRecord('2024-01-01')];
       const second = [makePeriodRecord('2024-01-02')];
@@ -111,24 +111,24 @@ describe('DataStore', () => {
 
   describe('forceSync()', () => {
     beforeEach(async () => {
-      await store.connectRemote(providerMock as unknown as RemoteStorageProvider);
-      providerMock.uploadData.mockClear(); // connectRemote calls forceSync, which might call upload
+      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
+      providerMock.uploadData.mockClear(); // connectCloud calls forceSync, which might call upload
     });
 
     it('does nothing if not connected', async () => {
-      store.disconnectRemote();
+      store.disconnectCloud();
       store.fetchFromCloudMock.mockClear();
       await store.forceSync();
       expect(store.fetchFromCloudMock).not.toHaveBeenCalled();
     });
 
-    it('fetches remote, merges, and updates local if different', async () => {
+    it('fetches cloud, merges, and updates local if different', async () => {
       const local = [makePeriodRecord('2024-01-01')];
-      const remote = [makePeriodRecord('2024-01-02')];
-      const merged = [...local, ...remote];
+      const cloud = [makePeriodRecord('2024-01-02')];
+      const merged = [...local, ...cloud];
 
       store.mergeMock.mockReturnValue(merged);
-      store.fetchFromCloudMock.mockResolvedValue(remote);
+      store.fetchFromCloudMock.mockResolvedValue(cloud);
       store.testData = local;
 
       await store.forceSync();
@@ -137,13 +137,13 @@ describe('DataStore', () => {
       expect(store.testData).toEqual(merged);
     });
 
-    it('uploads to cloud if merged differs from remote', async () => {
+    it('uploads to cloud if merged differs from cloud', async () => {
       const local = [makePeriodRecord('2024-01-01')];
-      const remote: DailyRecord[] = [];
+      const cloud: DailyRecord[] = [];
       const merged = [...local];
 
       store.mergeMock.mockReturnValue(merged);
-      store.fetchFromCloudMock.mockResolvedValue(remote);
+      store.fetchFromCloudMock.mockResolvedValue(cloud);
       store.testData = local;
 
       await store.forceSync();
@@ -188,17 +188,17 @@ describe('DataStore', () => {
       expect(fn).not.toHaveBeenCalled();
     });
 
-    it('subscribeCloudSyncStateChanged fires on disconnectRemote', () => {
+    it('subscribeCloudSyncStateChanged fires on disconnectCloud', () => {
       const fn = vi.fn();
       store.subscribeCloudSyncStateChanged(fn);
-      store.disconnectRemote();
+      store.disconnectCloud();
       expect(fn).toHaveBeenCalled();
     });
 
     it('subscribeDataChanged does not fire on cloudState change', () => {
       const fn = vi.fn();
       store.subscribeDataChanged(fn);
-      store.disconnectRemote();
+      store.disconnectCloud();
       expect(fn).not.toHaveBeenCalled();
     });
   });

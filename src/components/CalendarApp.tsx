@@ -9,7 +9,7 @@ import DayDetailsPanel from './DayDetailsPanel';
 import { useCalendarEvents } from '../hooks/useCalendarEvents';
 import { useCycleStats } from '../hooks/useCycleStats';
 import { GoogleAuthProvider } from '../auth/GoogleAuthProvider';
-import { GoogleDriveProvider } from '../storageProviders/GoogleDriveProvider';
+import { GoogleDriveProvider } from '../cloudStorageProviders/GoogleDriveProvider';
 import { RecordsStore } from '../store/RecordsStore';
 import { CLOUD_PROVIDER_KEY } from '../constants';
 
@@ -29,7 +29,7 @@ function CalendarApp() {
   // React bridge: re-render when data changes
   const [, rerender] = useReducer((x: number) => x + 1, 0);
 
-  // Lifecycle: init store, initialize auth, connect remote if authenticated
+  // Lifecycle: init store, initialize auth, connect cloud if authenticated
   useEffect(() => {
     recordsStore.init();
 
@@ -37,9 +37,9 @@ function CalendarApp() {
       if (!authProvider.isAuthenticated()) return;
       try {
         const provider = new GoogleDriveProvider(() => authProvider.getToken());
-        await recordsStore.connectRemote(provider);
+        await recordsStore.connectCloud(provider);
       } catch (e) {
-        console.error('Failed to connect remote', e);
+        console.error('Failed to connect cloud', e);
         await authProvider.signOut();
       }
     });
@@ -60,7 +60,7 @@ function CalendarApp() {
   }, [authProvider]);
 
   const handleLogout = useCallback(async () => {
-    recordsStore.disconnectRemote();
+    recordsStore.disconnectCloud();
     await authProvider.signOut();
   }, [authProvider, recordsStore]);
 
@@ -69,7 +69,7 @@ function CalendarApp() {
   }, [recordsStore]);
 
   const handleProviderChange = useCallback((id: string) => {
-    recordsStore.disconnectRemote();
+    recordsStore.disconnectCloud();
     if (authProvider.isAuthenticated()) authProvider.signOut();
     localStorage.setItem(CLOUD_PROVIDER_KEY, id);
     setSelectedProviderId(id);

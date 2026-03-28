@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
+import type { CloudStorageProvider } from './CloudStorageProviderInterface';
 
 /**
- * A shared test suite to verify that any given RemoteStorageProvider
+ * A shared test suite to verify that any given CloudStorageProvider
  * complies with the expected interface contract.
  *
  * @param provider The instantiated provider to test.
  */
-export function runProviderComplianceTests(provider: RemoteStorageProvider) {
+export function runProviderComplianceTests(provider: CloudStorageProvider) {
   describe(`Compliance Tests: ${provider.name}`, () => {
     it('should have a valid id and name', () => {
       expect(typeof provider.id).toBe('string');

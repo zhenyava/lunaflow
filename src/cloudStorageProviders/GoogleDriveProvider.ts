@@ -1,16 +1,16 @@
 import { CLOUD_STORAGE_FILENAME, CLOUD_STORAGE_FOLDER_NAME } from '../constants';
-import type { RemoteStorageProvider } from './RemoteStorageProviderInterface';
+import type { CloudStorageProvider } from './CloudStorageProviderInterface';
 
 interface GapiFileResult<T = unknown> {
   result: T;
 }
 
 /**
- * Google Drive implementation of RemoteStorageProvider.
+ * Google Drive implementation of CloudStorageProvider.
  * Pure storage — no auth logic. Receives a token getter via constructor injection.
  * Maps logical fileIds (defined by DataStore) to Google Drive internal file IDs.
  */
-export class GoogleDriveProvider implements RemoteStorageProvider {
+export class GoogleDriveProvider implements CloudStorageProvider {
   readonly id = 'google-drive';
   readonly name = 'Google Drive';
   private _driveFileIds = new Map<string, string>();

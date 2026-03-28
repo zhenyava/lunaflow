@@ -40,7 +40,7 @@ Owns all OAuth concerns:
 
 ---
 
-### `GoogleDriveProvider` (`src/storageProviders/`)
+### `GoogleDriveProvider` (`src/cloudStorageProviders/`)
 
 Pure storage — no auth knowledge. Receives a `getToken` function via constructor injection:
 
@@ -65,8 +65,8 @@ Abstract base class (plain TypeScript, no React) that handles:
 - **Cache-first load**: `init()` reads local data immediately so UI renders before auth completes
 - **`save(data)`**: writes to IndexedDB, schedules a debounced upload (2 s) to cloud
 - **`forceSync()`**: fetch → merge → upload cycle; sets `cloudState` throughout
-- **`connectRemote(provider)`**: sets the provider, calls `provider.ensureFileExists(this.fileId)`, triggers `forceSync()`
-- **`disconnectRemote()`**: clears provider, resets `cloudState` to `'unsynced'`
+- **`connectCloud(provider)`**: sets the provider, calls `provider.ensureFileExists(this.fileId)`, triggers `forceSync()`
+- **`disconnectCloud()`**: clears provider, resets `cloudState` to `'unsynced'`
 - **`fileId`**: abstract getter — subclasses define their stable logical file key
 - **Subscriber pattern**: `subscribeDataChanged(fn)` / `subscribeCloudSyncStateChanged(fn)` for React re-renders
 
@@ -76,7 +76,7 @@ Abstract methods subclasses must implement:
 abstract get fileId(): string;
 protected abstract loadLocal(): Promise<T | null>;
 protected abstract saveLocal(data: T): Promise<void>;
-protected abstract merge(local: T, remote: T): T;
+protected abstract merge(local: T, cloud: T): T;
 protected abstract fetchFromCloud(fileId: string): Promise<T>;
 protected abstract prepareDataToCloud(fileId: string, data: T): unknown;
 ```
@@ -122,7 +122,7 @@ Available providers are a constant in `src/constants.ts` (`AVAILABLE_CLOUD_PROVI
 Lifecycle `useEffect`:
 1. `recordsStore.init()` — load local data (cache-first, runs immediately)
 2. `authProvider.initialize()` — parse callback, load GAPI, restore token
-3. If authenticated → create `GoogleDriveProvider` lazily, call `recordsStore.connectRemote(provider)`
+3. If authenticated → create `GoogleDriveProvider` lazily, call `recordsStore.connectCloud(provider)`
 4. Subscribe to store + auth changes for React re-renders
 
 Owns browser env concerns: online/offline/focus listeners for `forceSync()`.
@@ -157,7 +157,7 @@ CalendarApp mounts
                   │
                   └─► [if isAuthenticated()]
                           └─► new GoogleDriveProvider(getToken)
-                                  └─► recordsStore.connectRemote(provider)
+                                  └─► recordsStore.connectCloud(provider)
                                           ├─► provider.ensureFileExists('lunaflow_data')
                                           └─► forceSync()
 ```
@@ -179,18 +179,18 @@ save(data)
 
 ### 3. Full sync (`forceSync()`)
 
-Triggered by: `connectRemote`, online event, focus event.
+Triggered by: `connectCloud`, online event, focus event.
 
 ```
 forceSync()
   │
   ├─► [guard: provider not connected → return]
   ├─► cloudState = 'syncing'
-  ├─► fetchFromCloud('lunaflow_data') ──► migrateData()  →  remote: T
-  ├─► merge(local, remote)             ──► merged: T
+  ├─► fetchFromCloud('lunaflow_data') ──► migrateData()  →  cloud: T
+  ├─► merge(local, cloud)             ──► merged: T
   │
   ├─► [if merged ≠ local]  saveLocal(merged) + notify()
-  ├─► [if merged ≠ remote] scheduleUpload(merged)
+  ├─► [if merged ≠ cloud]  scheduleUpload(merged)
   │
   └─► cloudState = 'synced'
 ```
@@ -254,7 +254,7 @@ IndexedDB always stores plain `DailyRecord[]` — never needs migration on read.
 
 ## Adding a new storage provider
 
-1. Implement `RemoteStorageProvider` interface in `src/storageProviders/`
+1. Implement `CloudStorageProvider` interface in `src/cloudStorageProviders/`
 2. Create a matching `AuthProvider` (or extend `GoogleAuthProvider` if reusable)
 3. Add an entry to `AVAILABLE_CLOUD_PROVIDERS` in `src/constants.ts`
 4. Handle provider instantiation in `CalendarApp` init effect based on `selectedProviderId`

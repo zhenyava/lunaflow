@@ -44,7 +44,7 @@ export default function SettingsModal({
              <div className="bg-white p-3 rounded-lg border border-gray-100 mb-3 shadow-sm">
                  <div className="flex items-center gap-2 mb-2">
                      <Cloud size={16} className="text-blue-500"/>
-                     <h3 className="font-medium text-gray-800">Remote Backup</h3>
+                     <h3 className="font-medium text-gray-800">Cloud Backup</h3>
                  </div>
                  
                  <div className="mb-3">

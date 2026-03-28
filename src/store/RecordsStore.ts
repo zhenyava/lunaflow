@@ -26,9 +26,9 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     }
   }
 
-  protected merge(local: DailyRecord[], remote: DailyRecord[]): DailyRecord[] {
+  protected merge(local: DailyRecord[], cloud: DailyRecord[]): DailyRecord[] {
     const map = new Map<string, DailyRecord>();
-    for (const record of [...local, ...remote]) {
+    for (const record of [...local, ...cloud]) {
       const existing = map.get(record.date);
       if (!existing || record.updatedAt > existing.updatedAt) {
         map.set(record.date, record);
@@ -38,8 +38,8 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
   }
 
   protected async fetchFromCloud(fileId: string): Promise<DailyRecord[]> {
-    if (!this._remoteStorageProvider) throw new Error('No storage provider');
-    const raw = await this._remoteStorageProvider.fetchData(fileId);
+    if (!this._cloudStorageProvider) throw new Error('No storage provider');
+    const raw = await this._cloudStorageProvider.fetchData(fileId);
     return this.migrateData(raw).records;
   }
 

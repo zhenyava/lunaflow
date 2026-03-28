@@ -1,4 +1,4 @@
-import type { RemoteStorageProvider } from '../storageProviders/RemoteStorageProviderInterface';
+import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 
 export function eventsEqual<T>(a: T, b: T): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
@@ -8,7 +8,7 @@ export type CloudState = 'unsynced' | 'uploading' | 'synced' | 'syncing';
 
 export abstract class DataStore<T> {
   protected data: T | null = null;
-  protected _remoteStorageProvider: RemoteStorageProvider | null = null;
+  protected _cloudStorageProvider: CloudStorageProvider | null = null;
   private _cloudState: CloudState = 'unsynced';
   private _dataListeners = new Set<() => void>();
   private _stateListeners = new Set<() => void>();
@@ -22,7 +22,7 @@ export abstract class DataStore<T> {
   protected abstract saveLocal(data: T): Promise<void>;
 
   // --- Abstract: sync ---
-  protected abstract merge(local: T, remote: T): T;
+  protected abstract merge(local: T, cloud: T): T;
   protected abstract fetchFromCloud(fileId: string): Promise<T>;
   protected abstract prepareDataToCloud(data: T): unknown;
 
@@ -69,19 +69,19 @@ export abstract class DataStore<T> {
   }
 
   async forceSync(): Promise<void> {
-    if (!this._remoteStorageProvider || this._cloudState === 'uploading') return;
+    if (!this._cloudStorageProvider || this._cloudState === 'uploading') return;
     this.setCloudState('syncing');
 
     try {
-      const remote = await this.fetchFromCloud(this.fileId);
+      const cloud = await this.fetchFromCloud(this.fileId);
       const local = this.data as T;
-      const merged = this.merge(local, remote);
+      const merged = this.merge(local, cloud);
 
       if (!eventsEqual(merged, local)) {
         this.setData(merged);
         await this.saveLocal(merged);
       }
-      if (!eventsEqual(merged, remote)) {
+      if (!eventsEqual(merged, cloud)) {
         this.scheduleUpload(merged);
       } else {
         this.setCloudState('synced');
@@ -91,20 +91,20 @@ export abstract class DataStore<T> {
     }
   }
 
-  // --- Remote connection lifecycle ---
+  // --- Cloud connection lifecycle ---
 
-  async connectRemote(provider: RemoteStorageProvider): Promise<void> {
-    this._remoteStorageProvider = provider;
+  async connectCloud(provider: CloudStorageProvider): Promise<void> {
+    this._cloudStorageProvider = provider;
     const ok = await provider.ensureFileExists(this.fileId);
     if (!ok) {
-      this._remoteStorageProvider = null;
-      throw new Error('Failed to ensure remote file exists');
+      this._cloudStorageProvider = null;
+      throw new Error('Failed to ensure cloud file exists');
     }
     await this.forceSync();
   }
 
-  disconnectRemote(): void {
-    this._remoteStorageProvider = null;
+  disconnectCloud(): void {
+    this._cloudStorageProvider = null;
     this.setCloudState('unsynced');
   }
 
@@ -125,7 +125,7 @@ export abstract class DataStore<T> {
     }
     this._dataListeners.clear();
     this._stateListeners.clear();
-    this._remoteStorageProvider = null;
+    this._cloudStorageProvider = null;
     this._cloudState = 'unsynced';
     this.data = null;
   }
@@ -133,16 +133,16 @@ export abstract class DataStore<T> {
   // --- Private helpers ---
 
   private scheduleUpload(data: T): void {
-    if (!this._remoteStorageProvider) return;
+    if (!this._cloudStorageProvider) return;
     if (this._uploadTimer !== null) clearTimeout(this._uploadTimer);
 
     this._uploadTimer = setTimeout(async () => {
       this._uploadTimer = null;
-      if (!this._remoteStorageProvider) return;
+      if (!this._cloudStorageProvider) return;
       this.setCloudState('uploading');
       try {
         const payload = this.prepareDataToCloud(data);
-        await this._remoteStorageProvider.uploadData(this.fileId, payload);
+        await this._cloudStorageProvider.uploadData(this.fileId, payload);
         this.setCloudState('synced');
       } catch {
         this.setCloudState('unsynced');

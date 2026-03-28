@@ -58,7 +58,7 @@ describe('RecordsStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (recordsStore as unknown as { data: DailyRecord[] | null }).data = null;
-    (recordsStore as unknown as { _remoteStorageProvider: unknown })._remoteStorageProvider = providerMock;
+    (recordsStore as unknown as { _cloudStorageProvider: unknown })._cloudStorageProvider = providerMock;
   });
 
   describe('events (derived view)', () => {
