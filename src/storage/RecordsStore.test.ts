@@ -128,7 +128,8 @@ describe('RecordsStore', () => {
 
   describe('fetchFromCloud()', () => {
     const fetchFromCloud = (store: RecordsStore) =>
-      (store as unknown as { fetchFromCloud(id: string): Promise<DailyRecord[]> }).fetchFromCloud('file-id');
+      (store as unknown as { fetchFromCloud(provider: typeof providerMock, id: string): Promise<DailyRecord[]> })
+        .fetchFromCloud(providerMock, 'file-id');
 
     it('fetches from provider and migrates data', async () => {
       const record = makePeriodRecord('2024-01-01');

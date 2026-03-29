@@ -17,7 +17,7 @@ class TestStore extends DataStore<DailyRecord[]> {
   protected loadLocal() { return this.loadLocalMock(); }
   protected saveLocal(data: DailyRecord[]) { return this.saveLocalMock(data); }
   protected merge(local: DailyRecord[], cloud: DailyRecord[]) { return this.mergeMock(local, cloud); }
-  protected fetchFromCloud(cloudPath: string) { return this.fetchFromCloudMock(cloudPath); }
+  protected fetchFromCloud(_provider: CloudStorageProvider, cloudPath: string) { return this.fetchFromCloudMock(cloudPath); }
   protected prepareDataToCloud(data: DailyRecord[]) { return this.prepareDataToCloudMock(data); }
 
   // Expose internals for testing

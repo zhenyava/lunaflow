@@ -1,4 +1,5 @@
 import type { DailyRecord } from './DailyRecord';
+import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 import { validateDailyRecords } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
 import { parseStorageEnvelope } from './StorageEnvelope';
@@ -47,9 +48,8 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 
-  protected async fetchFromCloud(cloudPath: string): Promise<DailyRecord[]> {
-    if (!this._cloudStorageProvider) throw new Error('No storage provider');
-    const raw = await this._cloudStorageProvider.fetchData(cloudPath);
+  protected async fetchFromCloud(provider: CloudStorageProvider, cloudPath: string): Promise<DailyRecord[]> {
+    const raw = await provider.fetchData(cloudPath);
     const envelope = parseStorageEnvelope(raw);
     if (!envelope) return [];
     return this.migrateData(envelope).records;

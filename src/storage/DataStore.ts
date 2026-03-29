@@ -8,7 +8,7 @@ export type CloudState = 'unsynced' | 'uploading' | 'synced' | 'syncing';
 
 export abstract class DataStore<T> {
   protected data: T | null = null;
-  protected _cloudStorageProvider: CloudStorageProvider | null = null;
+  private _cloudStorageProvider: CloudStorageProvider | null = null;
   private _cloudState: CloudState = 'unsynced';
   private _dataListeners = new Set<() => void>();
   private _stateListeners = new Set<() => void>();
@@ -23,7 +23,7 @@ export abstract class DataStore<T> {
 
   // --- Abstract: sync ---
   protected abstract merge(local: T, cloud: T): T;
-  protected abstract fetchFromCloud(cloudPath: string): Promise<T>;
+  protected abstract fetchFromCloud(provider: CloudStorageProvider, cloudPath: string): Promise<T>;
   protected abstract prepareDataToCloud(data: T): unknown;
 
   // --- Public state ---
@@ -73,7 +73,7 @@ export abstract class DataStore<T> {
     this.setCloudState('syncing');
 
     try {
-      const cloud = await this.fetchFromCloud(this.cloudPath);
+      const cloud = await this.fetchFromCloud(this._cloudStorageProvider, this.cloudPath);
       const local = this.data as T;
       const merged = this.merge(local, cloud);
 
