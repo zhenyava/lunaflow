@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
 import type { DailyRecord } from '../storage/DailyRecord';
 import { makePeriodRecord } from '../storage/DailyRecord';
@@ -10,13 +10,33 @@ const recordsStore = {
   get events() {
     return (this.data ?? []).filter((r: DailyRecord) => !r.isDeleted);
   },
-  get allRecords() {
-    return this.data;
-  },
   cloudState: 'unsynced' as const,
   cloudPath: null as string | null,
-  save: vi.fn(async function(records: DailyRecord[]) {
-    recordsStore.data = records;
+  getRecord: vi.fn((dateStr: string) => {
+    return (recordsStore.data ?? []).find((r: DailyRecord) => r.date === dateStr && !r.isDeleted);
+  }),
+  upsertRecord: vi.fn((dateStr: string, updates: Partial<DailyRecord>) => {
+    const prev = recordsStore.data ?? [];
+    const now = Date.now();
+    const idx = prev.findIndex(r => r.date === dateStr);
+    let newRecords: DailyRecord[];
+    if (idx >= 0) {
+      const newRecord = { ...prev[idx], ...updates, updatedAt: now };
+      const hasPeriod = !!newRecord.period;
+      const hasOvulation = !!newRecord.ovulation;
+      const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
+      newRecord.isDeleted = !hasPeriod && !hasOvulation && !hasSymptoms;
+      newRecords = [...prev];
+      newRecords[idx] = newRecord;
+    } else {
+      const newRecord: DailyRecord = { date: dateStr, updatedAt: now, ...updates };
+      const hasPeriod = !!newRecord.period;
+      const hasOvulation = !!newRecord.ovulation;
+      const hasSymptoms = !!newRecord.symptoms && Object.keys(newRecord.symptoms).length > 0;
+      newRecord.isDeleted = !hasPeriod && !hasOvulation && !hasSymptoms;
+      newRecords = [...prev, newRecord].sort((a, b) => a.date.localeCompare(b.date));
+    }
+    recordsStore.data = newRecords;
     listeners.forEach(fn => fn());
   }),
   subscribe: vi.fn((fn: () => void) => {
@@ -32,16 +52,16 @@ describe('useCalendarEvents', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2024-05-01T12:00:00Z'));
-    // Reset store state
     (recordsStore as { data: DailyRecord[] | null }).data = null;
-    vi.mocked(recordsStore.save).mockClear();
+    vi.mocked(recordsStore.upsertRecord).mockClear();
+    vi.mocked(recordsStore.getRecord).mockClear();
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it('reflects recordsStore.events', async () => {
+  it('reflects recordsStore.events', () => {
     const mockEvents = [makePeriodRecord('2024-03-01')];
     (recordsStore as { data: DailyRecord[] | null }).data = mockEvents;
 
@@ -50,7 +70,7 @@ describe('useCalendarEvents', () => {
   });
 
   describe('handleDayClick', () => {
-    it('adds a new period record when date is empty', async () => {
+    it('upserts a new period record when date is empty', () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
       const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
@@ -58,37 +78,42 @@ describe('useCalendarEvents', () => {
         result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
-      expect(recordsStore.save).toHaveBeenCalledWith([
-        { date: '2024-03-01', updatedAt: Date.now(), isDeleted: false, period: {} },
-      ]);
+      expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { period: {} });
     });
 
-    it('adds ovulation record when activeType is ovulation', async () => {
+    it('upserts an ovulation record when activeType is ovulation', () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
       const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => result.current.setActiveType('ovulation'));
       act(() => result.current.handleDayClick(new Date('2024-03-05T12:00:00Z')));
 
-      expect(recordsStore.save).toHaveBeenCalledWith([
-        { date: '2024-03-05', updatedAt: Date.now(), isDeleted: false, ovulation: {} },
-      ]);
+      expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-05', { ovulation: {} });
     });
 
-    it('marks record as deleted when toggling off the only event', async () => {
+    it('toggles off period when clicking existing period record', () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
       const { result } = renderHook(() => useCalendarEvents(recordsStore));
 
       act(() => result.current.setActiveType('period'));
       act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
 
-      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
-      expect(saved[0].isDeleted).toBe(true);
+      expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { period: undefined });
+    });
+
+    it('marks record as deleted when toggling off the only event', () => {
+      (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
+      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+
+      act(() => result.current.setActiveType('period'));
+      act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
+
+      expect(recordsStore.data![0].isDeleted).toBe(true);
     });
   });
 
   describe('updateRecord', () => {
-    it('updates existing record and calls recordsStore.save', async () => {
+    it('delegates to store.upsertRecord', () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
       const { result } = renderHook(() => useCalendarEvents(recordsStore));
@@ -97,16 +122,10 @@ describe('useCalendarEvents', () => {
         result.current.updateRecord('2024-03-01', { ovulation: {} });
       });
 
-      await waitFor(() => {
-        expect(recordsStore.save).toHaveBeenCalled();
-      });
-
-      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
-      expect(saved[0].ovulation).toEqual({});
-      expect(saved[0].period).toEqual({});
+      expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { ovulation: {} });
     });
 
-    it('marks record as deleted when all data is removed', async () => {
+    it('marks record as deleted when all data is removed', () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
       const { result } = renderHook(() => useCalendarEvents(recordsStore));
@@ -115,8 +134,7 @@ describe('useCalendarEvents', () => {
         result.current.updateRecord('2024-03-01', { period: undefined });
       });
 
-      const saved = vi.mocked(recordsStore.save).mock.calls[0][0];
-      expect(saved[0].isDeleted).toBe(true);
+      expect(recordsStore.data![0].isDeleted).toBe(true);
     });
   });
 });

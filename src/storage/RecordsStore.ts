@@ -1,6 +1,6 @@
 import type { DailyRecord } from './DailyRecord';
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
-import { validateDailyRecords } from './DailyRecord';
+import { validateDailyRecords, computeIsDeleted } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
 import { parseStorageEnvelope } from './StorageEnvelope';
 import { STORAGE_CURRENT_VERSION, CLOUD_STORAGE_FOLDER_NAME, CLOUD_STORAGE_FILENAME } from '../constants';
@@ -88,12 +88,56 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
     idb.closeDB(this.DB_NAME, this.STORE_NAME);
   }
 
+  // --- Record mutation API ---
+  upsertRecord(dateStr: string, updates: Partial<DailyRecord>): void {
+    const prev = this.data ?? [];
+    const now = Date.now();
+    const existingIdx = this._dateIndex.get(dateStr);
+
+    let newRecords: DailyRecord[];
+
+    if (existingIdx !== undefined) {
+      const newRecord: DailyRecord = { ...prev[existingIdx], ...updates, updatedAt: now };
+      newRecord.isDeleted = computeIsDeleted(newRecord);
+
+      newRecords = prev.slice();
+      newRecords[existingIdx] = newRecord;
+    } else {
+      const newRecord: DailyRecord = { date: dateStr, updatedAt: now, ...updates };
+      newRecord.isDeleted = computeIsDeleted(newRecord);
+
+      // Создаем копию, добавляем в конец и сортируем быстрым компаратором
+      newRecords = prev.slice();
+      newRecords.push(newRecord);
+      newRecords.sort((a, b) => {
+        if (a.date < b.date) return -1;
+        if (a.date > b.date) return 1;
+        return 0;
+      });
+    }
+
+    this.save(newRecords);
+  }
+
+  getRecord(dateStr: string): DailyRecord | undefined {
+    if (!this.data) return undefined;
+    const idx = this._dateIndex.get(dateStr);
+    if (idx === undefined) return undefined;
+    const record = this.data[idx];
+    return record.isDeleted ? undefined : record;
+  }
+
   // Derived views for UI
 
   private _events: readonly DailyRecord[] = [];
+  private _dateIndex = new Map<string, number>();
 
   protected override onDataChanged(data: DailyRecord[]): void {
     this._events = data.filter(r => !r.isDeleted);
+    this._dateIndex = new Map();
+    for (let i = 0; i < data.length; i++) {
+      this._dateIndex.set(data[i].date, i);
+    }
   }
 
   get events(): readonly DailyRecord[] {

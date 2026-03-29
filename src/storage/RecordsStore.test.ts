@@ -126,6 +126,79 @@ describe('RecordsStore', () => {
     });
   });
 
+  describe('upsertRecord()', () => {
+    it('creates a new record when date does not exist', async () => {
+      await recordsStore.save([makePeriodRecord('2024-01-01')]);
+      recordsStore.upsertRecord('2024-01-05', { period: {} });
+
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      const saved = vi.mocked(idb.write).mock.calls.at(-1)![3] as DailyRecord[];
+      expect(saved).toHaveLength(2);
+      expect(saved[1].date).toBe('2024-01-05');
+      expect(saved[1].period).toEqual({});
+      expect(saved[1].isDeleted).toBe(false);
+    });
+
+    it('inserts new records in sorted order', async () => {
+      await recordsStore.save([makePeriodRecord('2024-01-01'), makePeriodRecord('2024-01-10')]);
+      recordsStore.upsertRecord('2024-01-05', { period: {} });
+
+      const saved = vi.mocked(idb.write).mock.calls.at(-1)![3] as DailyRecord[];
+      expect(saved.map(r => r.date)).toEqual(['2024-01-01', '2024-01-05', '2024-01-10']);
+    });
+
+    it('updates an existing record', async () => {
+      await recordsStore.save([makePeriodRecord('2024-01-01')]);
+      recordsStore.upsertRecord('2024-01-01', { ovulation: {} });
+
+      const saved = vi.mocked(idb.write).mock.calls.at(-1)![3] as DailyRecord[];
+      expect(saved).toHaveLength(1);
+      expect(saved[0].period).toEqual({});
+      expect(saved[0].ovulation).toEqual({});
+    });
+
+    it('marks record as deleted when all data removed', async () => {
+      await recordsStore.save([makePeriodRecord('2024-01-01')]);
+      recordsStore.upsertRecord('2024-01-01', { period: undefined });
+
+      const saved = vi.mocked(idb.write).mock.calls.at(-1)![3] as DailyRecord[];
+      expect(saved[0].isDeleted).toBe(true);
+    });
+
+    it('keeps record active when symptoms remain', async () => {
+      const record: DailyRecord = { date: '2024-01-01', updatedAt: 1, period: {}, symptoms: { mood: ['happy'] } };
+      await recordsStore.save([record]);
+      recordsStore.upsertRecord('2024-01-01', { period: undefined });
+
+      const saved = vi.mocked(idb.write).mock.calls.at(-1)![3] as DailyRecord[];
+      expect(saved[0].isDeleted).toBe(false);
+    });
+  });
+
+  describe('getRecord()', () => {
+    it('returns record for existing non-deleted date', async () => {
+      const record = makePeriodRecord('2024-01-01');
+      await recordsStore.save([record]);
+      expect(recordsStore.getRecord('2024-01-01')).toEqual(record);
+    });
+
+    it('returns undefined for deleted record', async () => {
+      const deleted: DailyRecord = { date: '2024-01-01', updatedAt: 1, isDeleted: true };
+      await recordsStore.save([deleted]);
+      expect(recordsStore.getRecord('2024-01-01')).toBeUndefined();
+    });
+
+    it('returns undefined for non-existent date', async () => {
+      await recordsStore.save([makePeriodRecord('2024-01-01')]);
+      expect(recordsStore.getRecord('2024-06-15')).toBeUndefined();
+    });
+
+    it('returns undefined when data is null', () => {
+      expect(recordsStore.getRecord('2024-01-01')).toBeUndefined();
+    });
+  });
+
   describe('fetchFromCloud()', () => {
     const fetchFromCloud = (store: RecordsStore) =>
       (store as unknown as { fetchFromCloud(provider: typeof providerMock, id: string): Promise<DailyRecord[]> })

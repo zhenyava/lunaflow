@@ -74,6 +74,17 @@ export const makeOvulationRecord = (date: string, updatedAt = Date.now()): Daily
   ovulation: {}
 });
 
+/**
+ * Determines if a record should be marked as deleted (tombstone).
+ * A record is deleted when it has no period, no ovulation, and no non-empty symptoms.
+ */
+export function computeIsDeleted(record: Partial<DailyRecord>): boolean {
+  const hasPeriod = !!record.period;
+  const hasOvulation = !!record.ovulation;
+  const hasSymptoms = !!record.symptoms && Object.keys(record.symptoms).length > 0;
+  return !hasPeriod && !hasOvulation && !hasSymptoms;
+}
+
 // --- Schema validation ---
 
 import * as v from 'valibot';
