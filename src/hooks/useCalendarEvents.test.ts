@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCalendarEvents } from './useCalendarEvents';
+import type { RecordsStore } from '../storage/RecordsStore';
 import type { DailyRecord } from '../storage/DailyRecord';
 import { makePeriodRecord } from '../storage/DailyRecord';
 
@@ -12,10 +13,10 @@ const recordsStore = {
   },
   cloudState: 'unsynced' as const,
   cloudPath: null as string | null,
-  getRecord: vi.fn((dateStr: string) => {
+  getRecord: vi.fn(async (dateStr: string) => {
     return (recordsStore.data ?? []).find((r: DailyRecord) => r.date === dateStr && !r.isDeleted);
   }),
-  upsertRecord: vi.fn((dateStr: string, updates: Partial<DailyRecord>) => {
+  upsertRecord: vi.fn(async (dateStr: string, updates: Partial<DailyRecord>) => {
     const prev = recordsStore.data ?? [];
     const now = Date.now();
     const idx = prev.findIndex(r => r.date === dateStr);
@@ -43,7 +44,7 @@ const recordsStore = {
     listeners.add(fn);
     return () => listeners.delete(fn);
   }),
-  init: vi.fn(),
+  init: vi.fn(async () => {}),
   destroy: vi.fn(),
   forceSync: vi.fn(async () => {}),
 };
@@ -65,73 +66,85 @@ describe('useCalendarEvents', () => {
     const mockEvents = [makePeriodRecord('2024-03-01')];
     (recordsStore as { data: DailyRecord[] | null }).data = mockEvents;
 
-    const { result } = renderHook(() => useCalendarEvents(recordsStore));
+    const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
     expect(result.current.events).toEqual(mockEvents);
   });
 
   describe('handleDayClick', () => {
-    it('upserts a new period record when date is empty', () => {
+    it('upserts a new period record when date is empty', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => {
-        result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
+      await act(async () => {
+        await result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
       });
 
       expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { period: {} });
     });
 
-    it('upserts an ovulation record when activeType is ovulation', () => {
+    it('upserts an ovulation record when activeType is ovulation', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => result.current.setActiveType('ovulation'));
-      act(() => result.current.handleDayClick(new Date('2024-03-05T12:00:00Z')));
+      await act(async () => {
+        result.current.setActiveType('ovulation');
+      });
+      await act(async () => {
+        await result.current.handleDayClick(new Date('2024-03-05T12:00:00Z'));
+      });
 
       expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-05', { ovulation: {} });
     });
 
-    it('toggles off period when clicking existing period record', () => {
+    it('toggles off period when clicking existing period record', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => result.current.setActiveType('period'));
-      act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
+      await act(async () => {
+        result.current.setActiveType('period');
+      });
+      await act(async () => {
+        await result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
+      });
 
       expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { period: undefined });
     });
 
-    it('marks record as deleted when toggling off the only event', () => {
+    it('marks record as deleted when toggling off the only event', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [makePeriodRecord('2024-03-01')];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => result.current.setActiveType('period'));
-      act(() => result.current.handleDayClick(new Date('2024-03-01T12:00:00Z')));
+      await act(async () => {
+        result.current.setActiveType('period');
+      });
+      await act(async () => {
+        await result.current.handleDayClick(new Date('2024-03-01T12:00:00Z'));
+      });
 
       expect(recordsStore.data![0].isDeleted).toBe(true);
     });
   });
 
   describe('updateRecord', () => {
-    it('delegates to store.upsertRecord', () => {
+    it('delegates to store.upsertRecord', async () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => {
-        result.current.updateRecord('2024-03-01', { ovulation: {} });
+      await act(async () => {
+        await result.current.updateRecord('2024-03-01', { ovulation: {} });
       });
 
       expect(recordsStore.upsertRecord).toHaveBeenCalledWith('2024-03-01', { ovulation: {} });
     });
 
-    it('marks record as deleted when all data is removed', () => {
+    it('marks record as deleted when all data is removed', async () => {
       const existing = makePeriodRecord('2024-03-01');
       (recordsStore as { data: DailyRecord[] | null }).data = [existing];
-      const { result } = renderHook(() => useCalendarEvents(recordsStore));
+      const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
 
-      act(() => {
-        result.current.updateRecord('2024-03-01', { period: undefined });
+      await act(async () => {
+        await result.current.updateRecord('2024-03-01', { period: undefined });
       });
 
       expect(recordsStore.data![0].isDeleted).toBe(true);

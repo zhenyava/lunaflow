@@ -31,20 +31,20 @@ useCalendarEvents(store)  ← domain mutations only (via RecordsStore)
 
 ## Lifecycle Contract
 
-The `DataStore` implements a **Strict Guard** pattern to ensure data integrity and prevent race conditions.
+Both `DataStore` and `RecordsStore` implement a **Strict Guard** pattern to ensure data integrity and prevent race conditions.
 
 ### Mandatory Initialization
-Before calling any data-modifying methods (`save`, `forceSync`, `connectCloud`, `disconnectCloud`), you **must** call and await `init()`. 
+Before calling any data-modifying methods (`save`, `upsertRecord`, `forceSync`, `connectCloud`, `disconnectCloud`), you **must** call and await `init()`. 
 
-- **Fail-Fast**: If a method is called before `init()`, the `DataStore` will throw an explicit `Error`.
+- **Fail-Fast**: If a method is called before `init()`, an explicit `Error` is thrown.
 - **Idempotency**: Multiple calls to `init()` are safe; they return the same initialization promise.
-- **Async Safety**: Methods called while `init()` is still pending will automatically `await` its completion before proceeding.
+- **Async Safety**: Methods called while `init()` is still pending will automatically `await` its completion before proceeding. This prevents race conditions where mutations could overwrite data that is still being loaded from local storage.
 
 ### Error Handling & Finality
 The `init()` process always reaches a terminal state:
-- **Success**: Data is loaded, validated, migrated, and `setData(parsed)` notifies subscribers.
-- **Corruption/Missing**: If data is missing or `validator` returns `null`, `setData(null)` is called to notify subscribers that loading is finished.
-- **Failure**: If the local provider throws an error, it is caught, logged, and `setData(null)` is called.
+- **Success**: Data is loaded, validated, migrated, and subscribers are notified.
+- **Corruption/Missing**: If data is missing or validation fails, state is set to `null` and subscribers are notified that loading is finished.
+- **Failure**: If the local provider throws an error, it is caught, logged, and state is set to `null`.
 
 This ensures the UI never hangs in an infinite "loading" state.
 
@@ -103,8 +103,8 @@ Abstract base class for versioned migrations.
 The domain facade for `DailyRecord` data. It hides the complexity of `DataStore` and provides a clean API for the UI.
 - Owns the `DataStore<StorageEnvelope>` instance.
 - Provides derived views: `events` (filtered records) and `allRecords`.
-- Implements `upsertRecord` and `getRecord` logic.
-- **Sync Fix**: Synchronously updates a local `_dateIndex` cache during mutations to prevent race conditions during rapid consecutive edits.
+- Implements `async upsertRecord` and `async getRecord` logic with initialization guards.
+- **Sync Consistency**: Maintains an internal `_allRecordsInternal` cache that is updated *synchronously* during `upsertRecord`. This allows subsequent reads (even within the same microtask) to see the latest changes immediately, bypassing the inherent async delay of the underlying `DataStore.save()`.
 
 ---
 
@@ -114,7 +114,7 @@ The domain facade for `DailyRecord` data. It hides the complexity of `DataStore`
 1. `RecordsStore.init()` called.
 2. `DataStore` reads raw data from `IndexedDBProvider`.
 3. `DataStore` validates raw data using `parseStorageEnvelope`.
-4. `DataStore` migrates data using `EnvelopeMigrationService`.
+4. `DataStore` migrates data using `EnvelopeMigrationService` (applying `StorageEnvelope` migrations).
 5. UI is notified of data change.
 
 ### 2. Full Sync
@@ -138,7 +138,7 @@ Validation happens at the `DataStore` boundary using the injected `validator`. F
 - **Database**: `lunaflow`
 - **Object Store**: `appData`
 - **Key**: `events`
-- **Value**: `StorageEnvelope` (previously was `DailyRecord[]`)
+- **Value**: `StorageEnvelope`
 
 ---
 
@@ -146,4 +146,5 @@ Validation happens at the `DataStore` boundary using the injected `validator`. F
 1. Define the data interface and a Valibot schema.
 2. If versioning is needed, define a `StorageEnvelope` equivalent.
 3. Implement a `DataMigrationService` if necessary.
-4. Instantiate `DataStore<MyType>` with appropriate adapters and domain functions.
+4. Define migrations in a specific file (e.g., `src/storage/myTypeMigrations.ts`).
+5. Instantiate `DataStore<MyType>` with appropriate adapters and domain functions.

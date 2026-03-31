@@ -6,23 +6,23 @@ import type { RecordsStore } from '../storage/RecordsStore';
 export function useCalendarEvents(store: RecordsStore) {
   const [activeType, setActiveType] = useState<EventType>('period');
 
-  const handleDayClick = useCallback((date: Date) => {
+  const handleDayClick = useCallback(async (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const existing = store.getRecord(dateStr);
+    const existing = await store.getRecord(dateStr);
 
     if (existing) {
       const updates: Partial<DailyRecord> =
         activeType === 'period'
           ? { period: existing.period ? undefined : {} }
           : { ovulation: existing.ovulation ? undefined : {} };
-      store.upsertRecord(dateStr, updates);
+      await store.upsertRecord(dateStr, updates);
     } else {
-      store.upsertRecord(dateStr, activeType === 'period' ? { period: {} } : { ovulation: {} });
+      await store.upsertRecord(dateStr, activeType === 'period' ? { period: {} } : { ovulation: {} });
     }
   }, [activeType, store]);
 
-  const updateRecord = useCallback((dateStr: string, updates: Partial<DailyRecord>) => {
-    store.upsertRecord(dateStr, updates);
+  const updateRecord = useCallback(async (dateStr: string, updates: Partial<DailyRecord>) => {
+    await store.upsertRecord(dateStr, updates);
   }, [store]);
 
   return {
