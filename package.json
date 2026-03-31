@@ -10,7 +10,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check-all": "npm run build && npm run test && npm run lint"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
