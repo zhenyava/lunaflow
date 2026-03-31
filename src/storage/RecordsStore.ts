@@ -19,7 +19,7 @@ export class RecordsStore {
   private _initPromise: Promise<void> | null = null;
 
   constructor(storageProvider?: LocalStorageProvider) {
-    const local = storageProvider || new IndexedDBProvider('lunaflow', 'appData', 'events');
+    const local = storageProvider || new IndexedDBProvider('lunaflow', 'appData', 'userData');
     const migrationService = new EnvelopeMigrationService(STORAGE_CURRENT_VERSION, migrations);
 
     this._store = new DataStore<StorageEnvelope>(

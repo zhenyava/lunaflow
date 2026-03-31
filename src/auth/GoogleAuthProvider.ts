@@ -39,11 +39,16 @@ export class GoogleAuthProvider implements AuthProvider {
   readonly name = 'Google';
   private _authListeners = new Set<(isAuthenticated: boolean) => void>();
   private _gapiInited = false;
+  private _initPromise: Promise<void> | null = null;
 
   async initialize(): Promise<void> {
-    this.handleCallback();
-    await this.initGapi();
-    this.restoreGapiSession();
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = (async () => {
+      this.handleCallback();
+      await this.initGapi();
+      this.restoreGapiSession();
+    })();
+    return this._initPromise;
   }
 
   private handleCallback(): void {

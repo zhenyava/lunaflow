@@ -26,7 +26,6 @@ export function useCalendarEvents(store: RecordsStore) {
   }, [store]);
 
   return {
-    events: store.events,
     activeType,
     setActiveType,
     handleDayClick,

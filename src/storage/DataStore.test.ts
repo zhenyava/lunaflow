@@ -60,7 +60,7 @@ describe('DataStore', () => {
     vi.restoreAllMocks();
   });
 
-  describe('Contract & Dependency Integrity', () => {
+  describe('Constructor & Dependency Integrity', () => {
     it('throws in constructor if local provider is missing', () => {
       expect(() => new DataStore(null as unknown as LocalStorageProvider, null, validator, merger, isEqual, 'path'))
         .toThrow('Local storage provider is mandatory');
@@ -71,18 +71,24 @@ describe('DataStore', () => {
         .toThrow('Validator function is mandatory');
     });
 
-    it('Strict Lifecycle: throws if methods called before init()', async () => {
-      const methods = [
-        () => store.save({ val: 'new', v: 1 }),
-        () => store.forceSync(),
-        () => store.connectCloud(cloudProvider),
-        () => store.disconnectCloud(),
-      ];
+  });
 
-      for (const call of methods) {
-        await expect(call()).rejects.toThrow('Method called before initialization. You must call .init() first.');
+  describe('Strict Lifecycle: init mandatory', () => {
+    const methods = [
+      { name: 'save()', call: () => store.save({ val: 'new', v: 1 }) },
+      { name: 'forceSync()', call: () => store.forceSync() },
+      { name: 'connectCloud()', call: () => store.connectCloud(cloudProvider) },
+      { name: 'disconnectCloud()', call: () => store.disconnectCloud() },
+    ];
+
+    it.each(methods)(
+      'throws if $name is called before init()', 
+      async ({ call }) => {
+        await expect(call()).rejects.toThrow(
+          'Method called before initialization. You must call .init() first.'
+        );
       }
-    });
+    );
 
     it('Strict Lifecycle: awaits pending init()', async () => {
       let resolveRead: (v: unknown) => void;
@@ -256,6 +262,17 @@ describe('DataStore', () => {
       expect(store.cloudState).toBe('synced');
     });
 
+    it('is idempotent: concurrent calls return the same promise', async () => {
+      vi.mocked(cloudProvider.fetchData).mockClear();
+
+      const p1 = store.forceSync();
+      const p2 = store.forceSync();
+
+      await Promise.all([p1, p2]);
+
+      expect(cloudProvider.fetchData).toHaveBeenCalledTimes(1);
+    });
+
     it('updates local only if merged data matches cloud but differs from local', async () => {
       const localData = { val: 'old', v: 1 };
       const cloudData = { val: 'new', v: 1 };
@@ -293,6 +310,16 @@ describe('DataStore', () => {
     it('fails if file cannot be ensured', async () => {
       vi.mocked(cloudProvider.ensureFileExists).mockResolvedValue(false);
       await expect(store.connectCloud(cloudProvider)).rejects.toThrow('Failed to ensure cloud file exists');
+    });
+
+    it('is idempotent: concurrent calls return the same promise', async () => {
+      const p1 = store.connectCloud(cloudProvider);
+      const p2 = store.connectCloud(cloudProvider);
+
+      await Promise.all([p1, p2]);
+
+      expect(cloudProvider.ensureFileExists).toHaveBeenCalledTimes(1);
+      expect(cloudProvider.fetchData).toHaveBeenCalledTimes(1);
     });
   });
 });

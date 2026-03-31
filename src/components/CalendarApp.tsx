@@ -29,10 +29,15 @@ function CalendarApp() {
   // React bridge: re-render when data changes
   const [, rerender] = useReducer((x: number) => x + 1, 0);
 
-  // Lifecycle: init store, initialize auth, connect cloud if authenticated
+  // Lifecycle: init store, subscribe to data changes
   useEffect(() => {
     recordsStore.init();
+    const unsub = recordsStore.subscribeDataChanged(rerender);
+    return () => unsub();
+  }, [recordsStore]);
 
+  // Lifecycle: initialize auth, connect cloud if authenticated
+  useEffect(() => {
     authProvider.initialize().then(async () => {
       if (!authProvider.isAuthenticated()) return;
       try {
@@ -43,15 +48,8 @@ function CalendarApp() {
         await authProvider.signOut();
       }
     });
-
-    const unsubStore = recordsStore.subscribeDataChanged(rerender);
-    const unsubAuth = authProvider.onAuthStateChange(() => rerender());
-
-    return () => {
-      recordsStore.destroy();
-      unsubStore();
-      unsubAuth();
-    };
+    const unsub = authProvider.onAuthStateChange(() => rerender());
+    return () => unsub();
   }, [authProvider, recordsStore]);
 
   // Auth actions
@@ -78,7 +76,7 @@ function CalendarApp() {
   const isAuthenticated = authProvider.isAuthenticated();
 
   // Domain mutations hook
-  const { events, activeType, setActiveType, handleDayClick, updateRecord } = useCalendarEvents(recordsStore);
+  const { activeType, setActiveType, handleDayClick, updateRecord } = useCalendarEvents(recordsStore);
 
   // Mobile uses a long list of months
   const [mobileMonths] = useState<Date[]>(() =>
@@ -112,7 +110,7 @@ function CalendarApp() {
   }, [forceSync]);
 
   // Statistics & Predictions use cleaned events
-  const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(events, currentYear);
+  const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(recordsStore.events, currentYear);
 
   // Desktop: Generate months for the selected year
   const desktopMonths = useMemo(() => {
@@ -160,8 +158,8 @@ function CalendarApp() {
   const selectedRecord = useMemo(() => {
     if (!selectedDate) return undefined;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return events.find(e => e.date === dateStr);
-  }, [selectedDate, events]);
+    return recordsStore.events.find(e => e.date === dateStr);
+  }, [selectedDate, recordsStore.events]);
 
   return (
     <div className="flex flex-col h-full bg-slate-50 relative overflow-hidden">
@@ -194,7 +192,7 @@ function CalendarApp() {
 
           <MobileCalendarView
               months={mobileMonths}
-              events={events} // UI uses cleaned events
+              events={recordsStore.events} // UI uses cleaned events
               predictedDates={predictedDates}
               predictedOvulationDates={predictedOvulationDates}
               onDayClick={onDayClick}
@@ -203,7 +201,7 @@ function CalendarApp() {
 
           <DesktopCalendarView
               months={desktopMonths}
-              events={events} // UI uses cleaned events
+              events={recordsStore.events} // UI uses cleaned events
               predictedDates={predictedDates}
               predictedOvulationDates={predictedOvulationDates}
               onDayClick={onDayClick}

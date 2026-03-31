@@ -12,6 +12,8 @@ export class DataStore<T> {
   private _stateListeners = new Set<() => void>();
   private _uploadTimer: ReturnType<typeof setTimeout> | null = null;
   private _initPromise: Promise<void> | null = null;
+  private _connectPromise: Promise<void> | null = null;
+  private _syncPromise: Promise<void> | null = null;
 
   private _local: LocalStorageProvider;
   private _migrationService: DataMigrationService<T> | null;
@@ -66,6 +68,7 @@ export class DataStore<T> {
   // --- Private setters ---
 
   private setData(data: T | null): void {
+    console.log("set data " + data);
     this.data = data;
     this._dataListeners.forEach(fn => fn());
   }
@@ -121,56 +124,73 @@ export class DataStore<T> {
   }
 
   async forceSync(): Promise<void> {
-    await this.ensureInitialized();
-    if (!this._cloudStorageProvider || this._cloudState === 'uploading') return;
-    this.setCloudState('syncing');
+    if (this._syncPromise) return this._syncPromise;
+    this._syncPromise = (async () => {
+      await this.ensureInitialized();
+      if (!this._cloudStorageProvider || this._cloudState === 'uploading') return;
+      this.setCloudState('syncing');
 
-    try {
-      const raw = await this._cloudStorageProvider.fetchData(this.cloudPath);
-      let cloud = this._validator(raw);
-      if (!cloud) {
-        throw new Error('Invalid data from cloud');
-      }
+      try {
+        const raw = await this._cloudStorageProvider.fetchData(this.cloudPath);
+        let cloud = this._validator(raw);
+        if (!cloud) {
+          throw new Error('Invalid data from cloud');
+        }
 
-      if (this._migrationService) {
-        cloud = this._migrationService.migrate(cloud);
-      }
+        if (this._migrationService) {
+          cloud = this._migrationService.migrate(cloud);
+        }
 
-      const local = this.data;
-      if (!local) {
-        this.setData(cloud);
-        await this._local.write(cloud);
-        this.setCloudState('synced');
-        return;
-      }
+        const local = this.data;
+        if (!local) {
+          this.setData(cloud);
+          await this._local.write(cloud);
+          this.setCloudState('synced');
+          return;
+        }
 
-      const merged = this._merger(local, cloud);
+        const merged = this._merger(local, cloud);
 
-      if (!this._isEqual(merged, local)) {
-        this.setData(merged);
-        await this._local.write(merged);
-      }
-      if (!this._isEqual(merged, cloud)) {
+        if (!this._isEqual(merged, local)) {
+          this.setData(merged);
+          await this._local.write(merged);
+        }
+
+        if (!this._isEqual(merged, cloud)) {
+          this.setCloudState('unsynced');
+          this.scheduleUpload(merged);
+        } else {
+          this.setCloudState('synced');
+        }
+      } catch (e) {
+        console.error('[DataStore] forceSync failed', e);
         this.setCloudState('unsynced');
-        this.scheduleUpload(merged);
-      } else {
-        this.setCloudState('synced');
+      } finally {
+        this._syncPromise = null;
       }
-    } catch (e) {
-      console.error('[DataStore] forceSync failed', e);
-      this.setCloudState('unsynced');
-    }
+    })();
+
+    return this._syncPromise;
   }
 
   async connectCloud(provider: CloudStorageProvider): Promise<void> {
-    await this.ensureInitialized();
-    this._cloudStorageProvider = provider;
-    const ok = await provider.ensureFileExists(this.cloudPath);
-    if (!ok) {
-      this._cloudStorageProvider = null;
-      throw new Error('[DataStore] Failed to ensure cloud file exists');
-    }
-    await this.forceSync();
+    if (this._connectPromise) return this._connectPromise;
+    
+    this._connectPromise = (async () => {
+      try {
+        await this.ensureInitialized();
+        const ok = await provider.ensureFileExists(this.cloudPath);
+        if (!ok) {
+          throw new Error('[DataStore] Failed to ensure cloud file exists');
+        }
+        this._cloudStorageProvider = provider;
+        await this.forceSync();
+      } finally {
+        this._connectPromise = null;
+      }
+    })();
+
+    return this._connectPromise;
   }
 
   async disconnectCloud(): Promise<void> {
@@ -190,6 +210,8 @@ export class DataStore<T> {
     this._cloudState = 'unsynced';
     this.data = null;
     this._initPromise = null;
+    this._connectPromise = null;
+    this._syncPromise = null;
   }
 
   // --- Private helpers ---

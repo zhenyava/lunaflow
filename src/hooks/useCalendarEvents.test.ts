@@ -62,14 +62,6 @@ describe('useCalendarEvents', () => {
     vi.useRealTimers();
   });
 
-  it('reflects recordsStore.events', () => {
-    const mockEvents = [makePeriodRecord('2024-03-01')];
-    (recordsStore as { data: DailyRecord[] | null }).data = mockEvents;
-
-    const { result } = renderHook(() => useCalendarEvents(recordsStore as unknown as RecordsStore));
-    expect(result.current.events).toEqual(mockEvents);
-  });
-
   describe('handleDayClick', () => {
     it('upserts a new period record when date is empty', async () => {
       (recordsStore as { data: DailyRecord[] | null }).data = [];
