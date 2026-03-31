@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataStore } from './DataStore';
 import type { LocalStorageProvider } from './LocalStorageProvider';
-import type { DataMigrationService } from './migrationService';
+import type { DataMigrationService } from './DataMigrationService';
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 
 describe('DataStore', () => {

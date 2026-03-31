@@ -2,7 +2,7 @@ import { computeIsDeleted, type DailyRecord } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
 import { parseStorageEnvelope, EnvelopeMigrationService, isEnvelopesEqual } from './StorageEnvelope';
 import { STORAGE_CURRENT_VERSION, CLOUD_STORAGE_FOLDER_NAME, CLOUD_STORAGE_FILENAME } from '../constants';
-import { IndexedDBProvider } from './indexedDBStorage';
+import { IndexedDBProvider } from './IndexedDBProvider';
 import { DataStore } from './DataStore';
 import type { CloudState } from './DataStore';
 import type { LocalStorageProvider } from './LocalStorageProvider';

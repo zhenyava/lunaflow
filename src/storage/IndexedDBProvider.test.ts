@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { IndexedDBProvider } from './indexedDBStorage';
+import { IndexedDBProvider } from './IndexedDBProvider';
 
 const DB_NAME = 'testDb';
 const STORE_NAME = 'testStore';

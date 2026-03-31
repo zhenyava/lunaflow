@@ -1,4 +1,4 @@
-import { DataMigrationService } from './migrationService';
+import { DataMigrationService } from './DataMigrationService';
 import type { DailyRecord } from './DailyRecord';
 import { validateDailyRecords } from './DailyRecord';
 import * as v from 'valibot';

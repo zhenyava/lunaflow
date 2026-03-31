@@ -1,6 +1,6 @@
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 import type { LocalStorageProvider } from './LocalStorageProvider';
-import type { DataMigrationService } from './migrationService';
+import type { DataMigrationService } from './DataMigrationService';
 
 export type CloudState = 'unsynced' | 'uploading' | 'synced' | 'syncing';
 
