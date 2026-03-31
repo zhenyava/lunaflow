@@ -1,35 +1,54 @@
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
-
-export function eventsEqual<T>(a: T, b: T): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
+import type { LocalStorageProvider } from './LocalStorageProvider';
+import type { DataMigrationService } from './migrationService';
 
 export type CloudState = 'unsynced' | 'uploading' | 'synced' | 'syncing';
 
-export abstract class DataStore<T> {
+export class DataStore<T> {
   protected data: T | null = null;
   private _cloudStorageProvider: CloudStorageProvider | null = null;
   private _cloudState: CloudState = 'unsynced';
   private _dataListeners = new Set<() => void>();
   private _stateListeners = new Set<() => void>();
   private _uploadTimer: ReturnType<typeof setTimeout> | null = null;
+  private _initPromise: Promise<void> | null = null;
 
-  // --- Abstract: subclasses define their cloud storage path ---
-  abstract get cloudPath(): string;
+  private _local: LocalStorageProvider;
+  private _migrationService: DataMigrationService<T> | null;
+  private _validator: (raw: unknown) => T | null;
+  private _merger: (local: T, cloud: T) => T;
+  private _isEqual: (a: T, b: T) => boolean;
+  public readonly cloudPath: string;
 
-  // --- Abstract: local persistence ---
-  protected abstract loadLocal(): Promise<T | null>;
-  protected abstract saveLocal(data: T): Promise<void>;
+  constructor(
+    local: LocalStorageProvider,
+    migrationService: DataMigrationService<T> | null,
+    validator: (raw: unknown) => T | null,
+    merger: (local: T, cloud: T) => T,
+    isEqual: (a: T, b: T) => boolean,
+    cloudPath: string
+  ) {
+    if (!local) throw new Error('[DataStore] Local storage provider is mandatory');
+    if (!validator) throw new Error('[DataStore] Validator function is mandatory');
+    if (!merger) throw new Error('[DataStore] Merger function is mandatory');
+    if (!isEqual) throw new Error('[DataStore] Equality checker is mandatory');
 
-  // --- Abstract: sync ---
-  protected abstract merge(local: T, cloud: T): T;
-  protected abstract fetchFromCloud(provider: CloudStorageProvider, cloudPath: string): Promise<T>;
-  protected abstract prepareDataToCloud(data: T): unknown;
+    this._local = local;
+    this._migrationService = migrationService;
+    this._validator = validator;
+    this._merger = merger;
+    this._isEqual = isEqual;
+    this.cloudPath = cloudPath;
+  }
 
   // --- Public state ---
 
   get cloudState(): CloudState {
     return this._cloudState;
+  }
+
+  get currentData(): T | null {
+    return this.data;
   }
 
   // --- Subscriber pattern ---
@@ -44,11 +63,10 @@ export abstract class DataStore<T> {
     return () => this._stateListeners.delete(fn);
   }
 
-  // --- Private setters: combine assignment + notification ---
+  // --- Private setters ---
 
-  private setData(data: T): void {
+  private setData(data: T | null): void {
     this.data = data;
-    this.onDataChanged(data);
     this._dataListeners.forEach(fn => fn());
   }
 
@@ -57,65 +75,108 @@ export abstract class DataStore<T> {
     this._stateListeners.forEach(fn => fn());
   }
 
-  // Optional hook for subclasses to react to data changes (e.g. update derived caches)
-  protected onDataChanged(_data: T): void {}
+  private async ensureInitialized(): Promise<void> {
+    if (!this._initPromise) {
+      throw new Error(`[DataStore] Method called before initialization. You must call .init() first.`);
+    }
+    await this._initPromise;
+  }
 
   // --- Public API ---
 
+  async init(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+
+    this._initPromise = (async () => {
+      try {
+        const raw = await this._local.read();
+        if (raw === null) {
+          this.setData(null);
+          return;
+        }
+        let parsed = this._validator(raw);
+        if (parsed && this._migrationService) {
+          parsed = this._migrationService.migrate(parsed);
+        }
+        this.setData(parsed ?? null);
+      } catch (e) {
+        console.error('[DataStore] Failed to load from local storage', e);
+        this.setData(null);
+      }
+    })();
+
+    return this._initPromise;
+  }
+
   async save(data: T): Promise<void> {
+    await this.ensureInitialized();
     this.setData(data);
-    await this.saveLocal(data);
+    try {
+      await this._local.write(data);
+    } catch (e) {
+      console.error('[DataStore] Failed to save to local storage', e);
+    }
+    this.setCloudState('unsynced');
     this.scheduleUpload(data);
   }
 
   async forceSync(): Promise<void> {
+    await this.ensureInitialized();
     if (!this._cloudStorageProvider || this._cloudState === 'uploading') return;
     this.setCloudState('syncing');
 
     try {
-      const cloud = await this.fetchFromCloud(this._cloudStorageProvider, this.cloudPath);
-      const local = this.data as T;
-      const merged = this.merge(local, cloud);
-
-      if (!eventsEqual(merged, local)) {
-        this.setData(merged);
-        await this.saveLocal(merged);
+      const raw = await this._cloudStorageProvider.fetchData(this.cloudPath);
+      let cloud = this._validator(raw);
+      if (!cloud) {
+        throw new Error('Invalid data from cloud');
       }
-      if (!eventsEqual(merged, cloud)) {
+
+      if (this._migrationService) {
+        cloud = this._migrationService.migrate(cloud);
+      }
+
+      const local = this.data;
+      if (!local) {
+        this.setData(cloud);
+        await this._local.write(cloud);
+        this.setCloudState('synced');
+        return;
+      }
+
+      const merged = this._merger(local, cloud);
+
+      if (!this._isEqual(merged, local)) {
+        this.setData(merged);
+        await this._local.write(merged);
+      }
+      if (!this._isEqual(merged, cloud)) {
+        this.setCloudState('unsynced');
         this.scheduleUpload(merged);
       } else {
         this.setCloudState('synced');
       }
-    } catch {
+    } catch (e) {
+      console.error('[DataStore] forceSync failed', e);
       this.setCloudState('unsynced');
     }
   }
 
-  // --- Cloud connection lifecycle ---
-
   async connectCloud(provider: CloudStorageProvider): Promise<void> {
+    await this.ensureInitialized();
     this._cloudStorageProvider = provider;
     const ok = await provider.ensureFileExists(this.cloudPath);
     if (!ok) {
       this._cloudStorageProvider = null;
-      throw new Error('Failed to ensure cloud file exists');
+      throw new Error('[DataStore] Failed to ensure cloud file exists');
     }
     await this.forceSync();
   }
 
-  disconnectCloud(): void {
+  async disconnectCloud(): Promise<void> {
+    await this.ensureInitialized();
     this._cloudStorageProvider = null;
     this.setCloudState('unsynced');
-  }
-
-  // --- Lifecycle ---
-
-  init(): void {
-    this.loadLocal().then(data => {
-      if (data !== null) {
-        this.setData(data);
-      }
-    });
   }
 
   destroy(): void {
@@ -128,6 +189,7 @@ export abstract class DataStore<T> {
     this._cloudStorageProvider = null;
     this._cloudState = 'unsynced';
     this.data = null;
+    this._initPromise = null;
   }
 
   // --- Private helpers ---
@@ -141,8 +203,7 @@ export abstract class DataStore<T> {
       if (!this._cloudStorageProvider) return;
       this.setCloudState('uploading');
       try {
-        const payload = this.prepareDataToCloud(data);
-        await this._cloudStorageProvider.uploadData(this.cloudPath, payload);
+        await this._cloudStorageProvider.uploadData(this.cloudPath, data);
         this.setCloudState('synced');
       } catch {
         this.setCloudState('unsynced');

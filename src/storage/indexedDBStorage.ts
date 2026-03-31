@@ -1,46 +1,57 @@
-const dbCache = new Map<string, Promise<IDBDatabase>>();
+import type { LocalStorageProvider } from './LocalStorageProvider';
 
-export const openDB = (dbName: string, storeName: string): Promise<IDBDatabase> => {
-  const cacheKey = `${dbName}:${storeName}`;
-  if (!dbCache.has(cacheKey)) {
-    dbCache.set(cacheKey, new Promise((resolve, reject) => {
-      const request = indexedDB.open(dbName);
-      request.onupgradeneeded = () => {
-        request.result.createObjectStore(storeName);
-      };
-      request.onsuccess = () => resolve(request.result);
+export class IndexedDBProvider implements LocalStorageProvider {
+
+  private readonly _dbName: string;
+  private readonly _storeName: string;
+  private readonly _key: string;
+  private _dbPromise: Promise<IDBDatabase> | null = null;
+
+  constructor(dbName: string, storeName: string, key: string) {
+    this._dbName = dbName;
+    this._storeName = storeName;
+    this._key = key;
+  }
+
+  private _openDB(): Promise<IDBDatabase> {
+    if (!this._dbPromise) {
+      this._dbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(this._dbName);
+        request.onupgradeneeded = () => {
+          request.result.createObjectStore(this._storeName);
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+    return this._dbPromise;
+  }
+
+  async read(): Promise<unknown> {
+    const db = await this._openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this._storeName, 'readonly');
+      const request = tx.objectStore(this._storeName).get(this._key);
+      request.onsuccess = () => resolve(request.result ?? null);
       request.onerror = () => reject(request.error);
-    }));
+    });
   }
-  return dbCache.get(cacheKey)!;
-};
 
-export const read = async (dbName: string, storeName: string, key: string): Promise<unknown> => {
-  const db = await openDB(dbName, storeName);
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const request = tx.objectStore(storeName).get(key);
-    request.onsuccess = () => resolve(request.result ?? null);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const write = async (dbName: string, storeName: string, key: string, data: unknown): Promise<void> => {
-  const db = await openDB(dbName, storeName);
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    const request = tx.objectStore(storeName).put(data, key);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
-};
-
-export const closeDB = async (dbName: string, storeName: string): Promise<void> => {
-  const cacheKey = `${dbName}:${storeName}`;
-  const dbPromise = dbCache.get(cacheKey);
-  if (dbPromise) {
-    const db = await dbPromise;
-    db.close();
-    dbCache.delete(cacheKey);
+  async write(data: unknown): Promise<void> {
+    const db = await this._openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(this._storeName, 'readwrite');
+      const request = tx.objectStore(this._storeName).put(data, this._key);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
   }
-};
+
+  async close(): Promise<void> {
+    if (this._dbPromise) {
+      const db = await this._dbPromise;
+      db.close();
+      this._dbPromise = null;
+    }
+  }
+}

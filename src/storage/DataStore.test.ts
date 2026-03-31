@@ -1,222 +1,298 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DataStore } from './DataStore';
-import type { DailyRecord } from './DailyRecord';
-import { makePeriodRecord } from './DailyRecord';
+import type { LocalStorageProvider } from './LocalStorageProvider';
+import type { DataMigrationService } from './migrationService';
 import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
 
-// Minimal concrete subclass for testing DataStore behavior
-class TestStore extends DataStore<DailyRecord[]> {
-  loadLocalMock = vi.fn(async (): Promise<DailyRecord[] | null> => null);
-  saveLocalMock = vi.fn(async (): Promise<void> => {});
-  mergeMock = vi.fn((local: DailyRecord[], cloud: DailyRecord[]) => [...local, ...cloud]);
-  fetchFromCloudMock = vi.fn(async (): Promise<DailyRecord[]> => []);
-  prepareDataToCloudMock = vi.fn((data: DailyRecord[]) => ({ ver: 1, records: data }));
-
-  get cloudPath() { return 'TestFolder/test.json'; }
-
-  protected loadLocal() { return this.loadLocalMock(); }
-  protected saveLocal(data: DailyRecord[]) { return this.saveLocalMock(data); }
-  protected merge(local: DailyRecord[], cloud: DailyRecord[]) { return this.mergeMock(local, cloud); }
-  protected fetchFromCloud(_provider: CloudStorageProvider, cloudPath: string) { return this.fetchFromCloudMock(cloudPath); }
-  protected prepareDataToCloud(data: DailyRecord[]) { return this.prepareDataToCloudMock(data); }
-
-  // Expose internals for testing
-  get testData() { return this.data; }
-  set testData(val: DailyRecord[] | null) { this.data = val; }
-}
-
 describe('DataStore', () => {
-  let store: TestStore;
-  let providerMock: {
-    id: string;
-    name: string;
-    ensureFileExists: ReturnType<typeof vi.fn>;
-    fetchData: ReturnType<typeof vi.fn>;
-    uploadData: ReturnType<typeof vi.fn>;
-    signOut: ReturnType<typeof vi.fn>;
-  };
+  interface TestData {
+    val: string;
+    v: number;
+  }
+
+  let localProvider: LocalStorageProvider;
+  let migrationService: DataMigrationService<TestData>;
+  let validator: (raw: unknown) => TestData | null;
+  let merger: (l: TestData, r: TestData) => TestData;
+  let isEqual: (a: TestData, b: TestData) => boolean;
+  let store: DataStore<TestData>;
+  let cloudProvider: CloudStorageProvider;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    store = new TestStore();
-    providerMock = {
-      id: 'test-provider',
-      name: 'Test Provider',
-      ensureFileExists: vi.fn(async () => true),
-      fetchData: vi.fn(async () => []),
-      uploadData: vi.fn(async () => {}),
-      signOut: vi.fn(async () => {}),
+    vi.spyOn(console, 'error').mockImplementation(() => { });
+
+    localProvider = {
+      read: vi.fn(async () => ({ val: 'local', v: 1 })),
+      write: vi.fn(async () => { }),
     };
-    store.init();
+
+    migrationService = {
+      migrate: vi.fn((d: TestData) => d),
+    } as unknown as DataMigrationService<TestData>;
+
+    validator = vi.fn((raw: unknown) => raw as TestData);
+    merger = vi.fn((l: TestData, r: TestData) => ({ ...l, val: `${l.val}+${r.val}`, v: l.v }));
+    isEqual = vi.fn((a: TestData, b: TestData) => a.val === b.val && a.v === b.v);
+
+    store = new DataStore<TestData>(
+      localProvider,
+      migrationService,
+      validator,
+      merger,
+      isEqual,
+      'test/path.json'
+    );
+
+    cloudProvider = {
+      id: 'test-cloud',
+      name: 'Test Cloud',
+      ensureFileExists: vi.fn(async () => true),
+      fetchData: vi.fn(async () => ({ val: 'cloud', v: 1 })),
+      uploadData: vi.fn(async () => { }),
+    } as unknown as CloudStorageProvider;
   });
 
   afterEach(() => {
     store.destroy();
     vi.useRealTimers();
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
-  describe('save()', () => {
-    it('sets data and calls saveLocal', async () => {
-      const records = [makePeriodRecord('2024-01-01')];
-      await store.save(records);
-      expect(store.testData).toEqual(records);
-      expect(store.saveLocalMock).toHaveBeenCalledWith(records);
+  describe('Contract & Dependency Integrity', () => {
+    it('throws in constructor if local provider is missing', () => {
+      expect(() => new DataStore(null as unknown as LocalStorageProvider, null, validator, merger, isEqual, 'path'))
+        .toThrow('Local storage provider is mandatory');
     });
 
-    it('notifies data subscribers', async () => {
-      const listener = vi.fn();
-      store.subscribeDataChanged(listener);
-      await store.save([]);
-      expect(listener).toHaveBeenCalled();
+    it('throws in constructor if validator is missing', () => {
+      expect(() => new DataStore(localProvider, null, null as unknown as (raw: unknown) => TestData | null, merger, isEqual, 'path'))
+        .toThrow('Validator function is mandatory');
     });
 
-    it('sets cloudState to unsynced if not uploading', async () => {
-      await store.save([]);
-      expect(store.cloudState).toBe('unsynced');
+    it('Strict Lifecycle: throws if methods called before init()', async () => {
+      const methods = [
+        () => store.save({ val: 'new', v: 1 }),
+        () => store.forceSync(),
+        () => store.connectCloud(cloudProvider),
+        () => store.disconnectCloud(),
+      ];
+
+      for (const call of methods) {
+        await expect(call()).rejects.toThrow('Method called before initialization. You must call .init() first.');
+      }
     });
 
-    it('schedules debounced upload when provider is connected', async () => {
-      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
+    it('Strict Lifecycle: awaits pending init()', async () => {
+      let resolveRead: (v: unknown) => void;
+      localProvider.read = vi.fn(() => new Promise(resolve => { resolveRead = resolve; }));
 
-      const records = [makePeriodRecord('2024-01-01')];
-      await store.save(records);
+      const initPromise = store.init();
+      const savePromise = store.save({ val: 'new', v: 1 });
 
-      expect(providerMock.uploadData).not.toHaveBeenCalled();
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(providerMock.uploadData).toHaveBeenCalledWith('TestFolder/test.json', expect.any(Object));
-    });
+      expect(localProvider.write).not.toHaveBeenCalled();
 
-    it('does not upload if no provider is connected', async () => {
-      await store.save([]);
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(providerMock.uploadData).not.toHaveBeenCalled();
-    });
+      resolveRead!({ val: 'local', v: 1 });
+      await initPromise;
+      await savePromise;
 
-    it('cancels previous debounce timer when save is called again', async () => {
-      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
-
-      const first = [makePeriodRecord('2024-01-01')];
-      const second = [makePeriodRecord('2024-01-02')];
-
-      await store.save(first);
-      await vi.advanceTimersByTimeAsync(1000);
-      await store.save(second); // resets timer
-
-      await vi.advanceTimersByTimeAsync(2000);
-      expect(providerMock.uploadData).toHaveBeenCalledOnce();
-      expect(providerMock.uploadData).toHaveBeenCalledWith('TestFolder/test.json', { ver: 1, records: second });
+      expect(localProvider.write).toHaveBeenCalled();
     });
   });
 
-  describe('forceSync()', () => {
+  describe('init() logic', () => {
+    it('orchestrates: read from local cache -> validate -> migrate -> setData', async () => {
+      const raw = { raw: 'data' };
+      const parsed = { val: 'parsed', v: 1 };
+      const migrated = { val: 'migrated', v: 1 };
+
+      vi.mocked(localProvider.read).mockResolvedValue(raw);
+      vi.mocked(validator).mockReturnValue(parsed);
+      vi.mocked(migrationService.migrate).mockReturnValue(migrated);
+
+      await store.init();
+
+      expect(localProvider.read).toHaveBeenCalled();
+      expect(validator).toHaveBeenCalledWith(raw);
+      expect(migrationService.migrate).toHaveBeenCalledWith(parsed);
+      expect(store.currentData).toEqual(migrated);
+    });
+
+    it('is idempotent, init() only call once', async () => {
+      store.init();
+      store.init();
+      await vi.runAllTimersAsync();
+      expect(localProvider.read).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles null local data gracefully (fresh start)', async () => {
+      vi.mocked(localProvider.read).mockResolvedValue(null);
+      await store.init();
+      expect(store.currentData).toBeNull();
+      expect(validator).not.toHaveBeenCalled();
+    });
+
+    it('handles corrupt local data (validator returns null)', async () => {
+      vi.mocked(validator).mockReturnValue(null);
+      await store.init();
+      expect(store.currentData).toBeNull();
+    });
+
+    it('handles local provider errors', async () => {
+      vi.mocked(localProvider.read).mockRejectedValue(new Error('IO Error'));
+      await store.init();
+      expect(store.currentData).toBeNull();
+    });
+  });
+
+  describe('save() logic', () => {
     beforeEach(async () => {
-      await store.connectCloud(providerMock as unknown as CloudStorageProvider);
-      providerMock.uploadData.mockClear(); // connectCloud calls forceSync, which might call upload
+      await store.init();
     });
 
-    it('does nothing if not connected', async () => {
-      store.disconnectCloud();
-      store.fetchFromCloudMock.mockClear();
-      await store.forceSync();
-      expect(store.fetchFromCloudMock).not.toHaveBeenCalled();
-    });
+    it('orchestrates: setData -> writeLocal -> scheduleUpload', async () => {
+      await store.connectCloud(cloudProvider);
+      const newData = { val: 'new', v: 1 };
 
-    it('fetches cloud, merges, and updates local if different', async () => {
-      const local = [makePeriodRecord('2024-01-01')];
-      const cloud = [makePeriodRecord('2024-01-02')];
-      const merged = [...local, ...cloud];
+      await store.save(newData);
 
-      store.mergeMock.mockReturnValue(merged);
-      store.fetchFromCloudMock.mockResolvedValue(cloud);
-      store.testData = local;
+      expect(store.currentData).toEqual(newData);
+      expect(localProvider.write).toHaveBeenCalledWith(newData);
 
-      await store.forceSync();
-
-      expect(store.saveLocalMock).toHaveBeenCalledWith(merged);
-      expect(store.testData).toEqual(merged);
-    });
-
-    it('uploads to cloud if merged differs from cloud', async () => {
-      const local = [makePeriodRecord('2024-01-01')];
-      const cloud: DailyRecord[] = [];
-      const merged = [...local];
-
-      store.mergeMock.mockReturnValue(merged);
-      store.fetchFromCloudMock.mockResolvedValue(cloud);
-      store.testData = local;
-
-      await store.forceSync();
-
+      // Debounce check
+      expect(cloudProvider.uploadData).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(2000);
-      expect(providerMock.uploadData).toHaveBeenCalled();
+      expect(cloudProvider.uploadData).toHaveBeenCalledWith('test/path.json', newData);
     });
 
-    it('sets cloudState to synced after successful upload', async () => {
-      store.fetchFromCloudMock.mockResolvedValue([]);
-      store.mergeMock.mockReturnValue([]);
-      store.testData = [makePeriodRecord('2024-01-01')];
+    it('transitions cloudState: unsynced -> uploading -> synced', async () => {
+      await store.connectCloud(cloudProvider);
 
-      await store.forceSync(); // this will schedule upload
+      // Make uploadData hang so we can catch the 'uploading' state
+      let resolveUpload: () => void;
+      const uploadPromise = new Promise<void>((resolve) => { resolveUpload = resolve; });
+      vi.mocked(cloudProvider.uploadData).mockReturnValue(uploadPromise);
+
+      await store.save({ val: 'new', v: 1 });
+      expect(store.cloudState).toBe('unsynced');
+
+      // Trigger the timer
       await vi.advanceTimersByTimeAsync(2000);
-      // Wait for the async callback inside setTimeout to finish
-      await vi.runAllTicks();
+
+      // Now it should be uploading
+      expect(store.cloudState).toBe('uploading');
+
+      // Resolve the upload
+      resolveUpload!();
+      await vi.runAllTicks(); // Process the microtasks after resolution
 
       expect(store.cloudState).toBe('synced');
     });
+  });
 
-    it('resets cloudState to unsynced on error', async () => {
-      store.fetchFromCloudMock.mockRejectedValue(new Error('Network error'));
+  describe('forceSync() logic', () => {
+    beforeEach(async () => {
+      await store.init();
+      await store.connectCloud(cloudProvider);
+      vi.mocked(cloudProvider.uploadData).mockClear();
+      vi.mocked(localProvider.write).mockClear();
+    });
+
+    it('orchestrates: fetch -> validate -> migrate -> merge -> resolve conflicts', async () => {
+      const localData = { val: 'local', v: 1 };
+      const cloudData = { val: 'cloud', v: 1 };
+      const mergedData = { val: 'merged', v: 1 };
+
+      (store as unknown as { data: TestData }).data = localData;
+      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(validator).mockReturnValue(cloudData);
+      vi.mocked(merger).mockReturnValue(mergedData);
+      vi.mocked(isEqual).mockImplementation((a, b) => a.val === b.val);
+
+      await store.forceSync();
+
+      expect(cloudProvider.fetchData).toHaveBeenCalledWith('test/path.json');
+      expect(validator).toHaveBeenCalledWith(cloudData);
+      expect(migrationService.migrate).toHaveBeenCalledWith(cloudData);
+      expect(merger).toHaveBeenCalledWith(localData, cloudData);
+
+      // Since merged != local, it should save locally
+      expect(localProvider.write).toHaveBeenCalledWith(mergedData);
+      // Since merged != cloud, it should schedule upload
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(cloudProvider.uploadData).toHaveBeenCalledWith('test/path.json', mergedData);
+    });
+
+    it('aborts and transitions to unsynced if cloud data is invalid', async () => {
+      vi.mocked(validator).mockReturnValue(null);
       await store.forceSync();
       expect(store.cloudState).toBe('unsynced');
+      expect(localProvider.write).not.toHaveBeenCalled();
+    });
+
+    it('sets synced if merged data is already equal to both local and cloud', async () => {
+      const sameData = { val: 'same', v: 1 };
+      (store as unknown as { data: TestData }).data = sameData;
+      vi.mocked(cloudProvider.fetchData).mockResolvedValue(sameData);
+      vi.mocked(validator).mockReturnValue(sameData);
+      vi.mocked(isEqual).mockReturnValue(true);
+
+      await store.forceSync();
+      expect(store.cloudState).toBe('synced');
+      expect(localProvider.write).not.toHaveBeenCalled();
+    });
+
+    it('adopts cloud data immediately if local data is null', async () => {
+      const cloudData = { val: 'cloud', v: 1 };
+      (store as unknown as { data: TestData | null }).data = null;
+      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(validator).mockReturnValue(cloudData);
+
+      await store.forceSync();
+
+      expect(store.currentData).toEqual(cloudData);
+      expect(localProvider.write).toHaveBeenCalledWith(cloudData);
+      expect(store.cloudState).toBe('synced');
+    });
+
+    it('updates local only if merged data matches cloud but differs from local', async () => {
+      const localData = { val: 'old', v: 1 };
+      const cloudData = { val: 'new', v: 1 };
+      
+      (store as unknown as { data: TestData }).data = localData;
+      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(validator).mockReturnValue(cloudData);
+      // Merger returns cloudData (last write wins)
+      vi.mocked(merger).mockReturnValue(cloudData);
+      // isEqual(merged, local) -> false
+      // isEqual(merged, cloud) -> true
+      vi.mocked(isEqual).mockImplementation((a, b) => a.val === b.val);
+
+      await store.forceSync();
+
+      expect(localProvider.write).toHaveBeenCalledWith(cloudData);
+      expect(store.cloudState).toBe('synced');
+      expect(cloudProvider.uploadData).not.toHaveBeenCalled();
     });
   });
 
-  describe('subscriber pattern', () => {
-    it('subscribeDataChanged fires on save', async () => {
-      const fn = vi.fn();
-      store.subscribeDataChanged(fn);
-      await store.save([]);
-      expect(fn).toHaveBeenCalled();
+  describe('connectCloud() logic', () => {
+    beforeEach(async () => {
+      await store.init();
     });
 
-    it('unsubscribe stops data notifications', async () => {
-      const fn = vi.fn();
-      const unsub = store.subscribeDataChanged(fn);
-      unsub();
-      await store.save([]);
-      expect(fn).not.toHaveBeenCalled();
+    it('ensures file exists and triggers immediate forceSync', async () => {
+      const forceSyncSpy = vi.spyOn(store, 'forceSync');
+      await store.connectCloud(cloudProvider);
+
+      expect(cloudProvider.ensureFileExists).toHaveBeenCalledWith('test/path.json');
+      expect(forceSyncSpy).toHaveBeenCalled();
     });
 
-    it('subscribeCloudSyncStateChanged fires on disconnectCloud', () => {
-      const fn = vi.fn();
-      store.subscribeCloudSyncStateChanged(fn);
-      store.disconnectCloud();
-      expect(fn).toHaveBeenCalled();
-    });
-
-    it('subscribeDataChanged does not fire on cloudState change', () => {
-      const fn = vi.fn();
-      store.subscribeDataChanged(fn);
-      store.disconnectCloud();
-      expect(fn).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('init() and destroy()', () => {
-    it('loads local data on init and notifies', async () => {
-      const records = [makePeriodRecord('2024-01-01')];
-      const freshStore = new TestStore();
-      freshStore.loadLocalMock.mockResolvedValue(records);
-      const listener = vi.fn();
-      freshStore.subscribeDataChanged(listener);
-
-      freshStore.init();
-      await vi.runAllTimersAsync();
-
-      expect(freshStore.testData).toEqual(records);
-      expect(listener).toHaveBeenCalled();
-      freshStore.destroy();
+    it('fails if file cannot be ensured', async () => {
+      vi.mocked(cloudProvider.ensureFileExists).mockResolvedValue(false);
+      await expect(store.connectCloud(cloudProvider)).rejects.toThrow('Failed to ensure cloud file exists');
     });
   });
 });

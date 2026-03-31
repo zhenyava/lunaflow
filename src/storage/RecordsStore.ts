@@ -1,96 +1,131 @@
-import type { DailyRecord } from './DailyRecord';
-import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
-import { validateDailyRecords, computeIsDeleted } from './DailyRecord';
+import { computeIsDeleted, type DailyRecord } from './DailyRecord';
 import type { StorageEnvelope } from './StorageEnvelope';
-import { parseStorageEnvelope } from './StorageEnvelope';
+import { parseStorageEnvelope, EnvelopeMigrationService, isEnvelopesEqual } from './StorageEnvelope';
 import { STORAGE_CURRENT_VERSION, CLOUD_STORAGE_FOLDER_NAME, CLOUD_STORAGE_FILENAME } from '../constants';
-import * as idb from './indexedDBStorage';
-import { migrations } from './migrationData';
+import { IndexedDBProvider } from './indexedDBStorage';
 import { DataStore } from './DataStore';
+import type { CloudState } from './DataStore';
+import type { LocalStorageProvider } from './LocalStorageProvider';
 
-export class RecordsStore extends DataStore<DailyRecord[]> {
-  get cloudPath(): string {
-    return `${CLOUD_STORAGE_FOLDER_NAME}/${CLOUD_STORAGE_FILENAME}`;
+import type { CloudStorageProvider } from '../cloudStorageProviders/CloudStorageProviderInterface';
+
+import { migrations } from './envelopeMigrations';
+
+export class RecordsStore {
+  private _store: DataStore<StorageEnvelope>;
+  private _events: readonly DailyRecord[] = [];
+  private _dateIndex = new Map<string, number>();
+  private _allRecordsInternal: DailyRecord[] = [];
+  private _initPromise: Promise<void> | null = null;
+
+  constructor(storageProvider?: LocalStorageProvider) {
+    const local = storageProvider || new IndexedDBProvider('lunaflow', 'appData', 'events');
+    const migrationService = new EnvelopeMigrationService(STORAGE_CURRENT_VERSION, migrations);
+
+    this._store = new DataStore<StorageEnvelope>(
+      local,
+      migrationService,
+      parseStorageEnvelope,
+      this._mergeEnvelopes.bind(this),
+      isEnvelopesEqual,
+      `${CLOUD_STORAGE_FOLDER_NAME}/${CLOUD_STORAGE_FILENAME}`
+    );
+
+    this._store.subscribeDataChanged(() => this._onDataChanged());
   }
 
-  private readonly DB_NAME = 'lunaflow';
-  private readonly STORE_NAME = 'appData';
-  private readonly STORE_KEY = 'events';
-
-  protected async loadLocal(): Promise<DailyRecord[] | null> {
-    try {
-      const raw = await idb.read(this.DB_NAME, this.STORE_NAME, this.STORE_KEY);
-      if (raw === null) return [];
-      if (!Array.isArray(raw)) return [];
-      return validateDailyRecords(raw);
-    } catch (e) {
-      console.error('Failed to load from IndexedDB', e);
-      return [];
-    }
-  }
-
-  protected async saveLocal(data: DailyRecord[]): Promise<void> {
-    try {
-      await idb.write(this.DB_NAME, this.STORE_NAME, this.STORE_KEY, data);
-    } catch (e) {
-      console.error('Failed to save to IndexedDB', e);
-    }
-  }
-
-  protected merge(local: DailyRecord[], cloud: DailyRecord[]): DailyRecord[] {
+  private _mergeEnvelopes(local: StorageEnvelope, cloud: StorageEnvelope): StorageEnvelope {
     const map = new Map<string, DailyRecord>();
-    for (const record of [...local, ...cloud]) {
+    for (const record of [...local.records, ...cloud.records]) {
       const existing = map.get(record.date);
       if (!existing || record.updatedAt > existing.updatedAt) {
         map.set(record.date, record);
       }
     }
-    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+    const mergedRecords = Array.from(map.values()).sort((a, b) => this._sortFunc(a, b));
+    return {
+      ver: Math.max(local.ver, cloud.ver),
+      records: mergedRecords
+    };
   }
 
-  protected async fetchFromCloud(provider: CloudStorageProvider, cloudPath: string): Promise<DailyRecord[]> {
-    const raw = await provider.fetchData(cloudPath);
-    const envelope = parseStorageEnvelope(raw);
-    if (!envelope) return [];
-    return this.migrateData(envelope).records;
+  private _sortFunc(a: DailyRecord, b: DailyRecord): number {
+    if (a.date < b.date) return -1;
+    if (a.date > b.date) return 1;
+    return 0;
   }
 
-  protected prepareDataToCloud(data: DailyRecord[]): StorageEnvelope {
-    return { ver: STORAGE_CURRENT_VERSION, records: data };
-  }
-
-  private migrateData(envelope: StorageEnvelope): { records: DailyRecord[]; wasMigrated: boolean } {
-    let currentVer = envelope.ver;
-    let records = envelope.records;
-
-    const initialVer = currentVer;
-
-    while (currentVer < STORAGE_CURRENT_VERSION && currentVer < migrations.length) {
-      const migrateFn = migrations[currentVer];
-      if (migrateFn) {
-        records = migrateFn(records) as DailyRecord[];
-        currentVer++;
-      } else {
-        break;
-      }
+  private _onDataChanged(): void {
+    const data = this._store.currentData;
+    if (!data) {
+      this._events = [];
+      this._dateIndex.clear();
+      this._allRecordsInternal = [];
+      return;
     }
 
-    return { records, wasMigrated: initialVer < currentVer };
+    this._allRecordsInternal = data.records;
+    this._events = data.records.filter(r => !r.isDeleted);
+    const newIndex = new Map<string, number>();
+    for (let i = 0; i < data.records.length; i++) {
+      newIndex.set(data.records[i].date, i);
+    }
+    this._dateIndex = newIndex;
   }
 
-  override init(): void {
-    idb.openDB(this.DB_NAME, this.STORE_NAME);
-    super.init();
+  private async _ensureInitialized(): Promise<void> {
+    if (!this._initPromise) {
+      throw new Error('[RecordsStore] Method called before initialization. You must call .init() first.');
+    }
+    await this._initPromise;
   }
 
-  override destroy(): void {
-    super.destroy();
-    idb.closeDB(this.DB_NAME, this.STORE_NAME);
+  // --- Public API ---
+
+  async init(): Promise<void> {
+    if (this._initPromise) return this._initPromise;
+    this._initPromise = this._store.init();
+    return this._initPromise;
+  }
+
+  destroy(): void {
+    this._store.destroy();
+    this._initPromise = null;
+    this._allRecordsInternal = [];
+    this._events = [];
+    this._dateIndex.clear();
+  }
+
+  async connectCloud(provider: CloudStorageProvider): Promise<void> {
+    await this._store.connectCloud(provider);
+  }
+
+  async forceSync(): Promise<void> {
+    await this._store.forceSync();
+  }
+
+  async disconnectCloud(): Promise<void> {
+    await this._store.disconnectCloud();
+  }
+
+  subscribeDataChanged(fn: () => void): () => void {
+    return this._store.subscribeDataChanged(fn);
+  }
+
+  subscribeCloudSyncStateChanged(fn: () => void): () => void {
+    return this._store.subscribeCloudSyncStateChanged(fn);
+  }
+
+  get cloudState(): CloudState {
+    return this._store.cloudState;
   }
 
   // --- Record mutation API ---
-  upsertRecord(dateStr: string, updates: Partial<DailyRecord>): void {
-    const prev = this.data ?? [];
+
+  async upsertRecord(dateStr: string, updates: Partial<DailyRecord>): Promise<void> {
+    await this._ensureInitialized();
+
+    const prev = this._allRecordsInternal;
     const now = Date.now();
     const existingIdx = this._dateIndex.get(dateStr);
 
@@ -106,38 +141,25 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
       const newRecord: DailyRecord = { date: dateStr, updatedAt: now, ...updates };
       newRecord.isDeleted = computeIsDeleted(newRecord);
 
-      // Создаем копию, добавляем в конец и сортируем быстрым компаратором
       newRecords = prev.slice();
       newRecords.push(newRecord);
-      newRecords.sort((a, b) => {
-        if (a.date < b.date) return -1;
-        if (a.date > b.date) return 1;
-        return 0;
-      });
+      newRecords.sort((a, b) => this._sortFunc(a, b));
     }
 
-    this.save(newRecords);
+    // Rely on DataStore's save() to trigger _onDataChanged() via subscription.
+    // This avoids double-calculating events and index updates.
+    await this._store.save({ ver: STORAGE_CURRENT_VERSION, records: newRecords });
   }
 
-  getRecord(dateStr: string): DailyRecord | undefined {
-    if (!this.data) return undefined;
+  async getRecord(dateStr: string): Promise<DailyRecord | undefined> {
+    await this._ensureInitialized();
     const idx = this._dateIndex.get(dateStr);
     if (idx === undefined) return undefined;
-    const record = this.data[idx];
+
+    // Use internal cache for zero-lag consistency after local mutations
+    const records = this._allRecordsInternal;
+    const record = records[idx];
     return record.isDeleted ? undefined : record;
-  }
-
-  // Derived views for UI
-
-  private _events: readonly DailyRecord[] = [];
-  private _dateIndex = new Map<string, number>();
-
-  protected override onDataChanged(data: DailyRecord[]): void {
-    this._events = data.filter(r => !r.isDeleted);
-    this._dateIndex = new Map();
-    for (let i = 0; i < data.length; i++) {
-      this._dateIndex.set(data[i].date, i);
-    }
   }
 
   get events(): readonly DailyRecord[] {
@@ -145,7 +167,6 @@ export class RecordsStore extends DataStore<DailyRecord[]> {
   }
 
   get allRecords(): readonly DailyRecord[] | null {
-    return this.data;
+    return this._allRecordsInternal.length > 0 ? this._allRecordsInternal : null;
   }
 }
-

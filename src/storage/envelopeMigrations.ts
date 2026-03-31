@@ -1,13 +1,13 @@
-import type { DailyRecord } from './DailyRecord';
+import type { StorageEnvelope } from './StorageEnvelope';
 
-export type MigrationFunction = (data: DailyRecord[]) => DailyRecord[];
+export type MigrationFunction = (data: StorageEnvelope) => StorageEnvelope;
 
 /**
  * Standard identity migration function for when the schema is backwards compatible
  * and only the version number needs to be bumped.
  */
-export const migrateVersionNumber = (records: DailyRecord[]): DailyRecord[] => {
-  return records;
+export const migrateVersionNumber = (env: StorageEnvelope): StorageEnvelope => {
+  return env;
 };
 
 /**
@@ -16,5 +16,5 @@ export const migrateVersionNumber = (records: DailyRecord[]): DailyRecord[] => {
  * Index 0 is unused (versions start at 1).
  */
 export const migrations: MigrationFunction[] = [
-  () => [] as DailyRecord[], // Index 0 (unused)
+  (env: StorageEnvelope) => env, // Index 0 (unused)
 ];

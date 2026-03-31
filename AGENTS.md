@@ -29,15 +29,21 @@ npm run test -- -t "test name"  # Run specific test by name
 
 ## Code Style Guidelines
 
-### TypeScript Configuration
+### TypeScript Configuration & Strict Mode Compliance
 
-- **Strict mode enabled** with comprehensive linting
-- **Target**: ES2022 with modern module resolution
-- **No unused locals/parameters** allowed
-- **JSX**: React-jsx transform (no React imports needed for JSX)
+The project uses a very strict TypeScript configuration (`tsconfig.app.json`). AI agents **must** adhere to the following rules:
+
+- **No Parameter Properties**: Due to `erasableSyntaxOnly: true`, you **cannot** use shorthand constructor parameters (e.g., `constructor(private x: T)`). You must explicitly declare the field and assign it in the constructor.
+- **Type-Only Imports**: Due to `verbatimModuleSyntax: true`, types must be imported using the `type` keyword: `import type { T } from './types'`.
+- **Absolute Prohibition of `any`**: The use of `any` is strictly forbidden and will fail linting. Use `unknown` and type guards/schemas instead.
+- **Strict mode enabled** with comprehensive linting.
+- **Target**: ES2022 with modern module resolution.
+- **No unused locals/parameters** allowed.
+- **JSX**: React-jsx transform (no React imports needed for JSX).
 
 ### Naming Conventions
 
+- **Private Variables**: Use an underscore prefix for all private class members (e.g., `private _store`, `private _local`).
 - **Services**: camelCase (e.g., `statsService`, `storageService`)
 - **Constants**: UPPER_SNAKE_CASE (e.g., `INITIAL_START_DATE`, `LAUNCHED_KEY`)
 - **Types**: PascalCase for interfaces/types (e.g., `CalendarEvent`, `EventType`)
@@ -86,6 +92,12 @@ src/
 - Cover **edge cases** and error conditions
 - Focus on **cycle calculation logic** - it's the core domain
 - Mock external dependencies (Google APIs, localStorage)
+
+### Organizing Test Files
+
+- Organize test suites for stores and services by their public method names.
+- Use `describe('methodName', ...)` blocks to group tests related to a specific method.
+- Follow a consistent structure: `Domain Logic` for general behavior, followed by method-specific blocks (e.g., `describe('upsertRecord', ...)`, `describe('deleteRecord', ...)`), and finally `Lifecycle Guards`.
 
 ## Architecture Patterns
 
@@ -147,7 +159,8 @@ These checks are sequential and must pass before a PR can be merged.
 1. Run `npm run lint` - fix all ESLint errors
 2. Run `npm run test` - ensure all tests pass
 3. Run `npm run build` - verify production build works
-4. Check TypeScript types - no `any` types allowed
+4. **No `any` types**: Ensure zero `any` usages in both source and test files.
+5. **No Parameter Properties**: Ensure all class properties are explicitly declared and assigned.
 
 ## Development Workflow
 
