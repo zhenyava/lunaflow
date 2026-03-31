@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:vercel": "vercel dev --local-config vercel.dev.json",
+    "dev:vercel:clean": "VITE_CLEAR_STORAGE=true vercel dev --local-config vercel.dev.json",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
