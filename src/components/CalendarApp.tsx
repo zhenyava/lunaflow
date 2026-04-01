@@ -73,6 +73,19 @@ function CalendarApp() {
     setSelectedProviderId(id);
   }, [authProvider, recordsStore]);
 
+  // Environment awareness: CalendarApp owns online/offline/focus detection
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+  // Environment event handlers
+  const handleOnline = useCallback(() => { 
+    setIsOnline(true); 
+    handlePullData(); 
+  }, [handlePullData]);
+
+  const handleOffline = useCallback(() => setIsOnline(false), []);
+
+  const handleFocus = useCallback(() => handlePullData(), [handlePullData]);
+
   const isAuthenticated = authProvider.isAuthenticated();
 
   // Domain mutations hook
@@ -92,13 +105,7 @@ function CalendarApp() {
   // Edit Mode State
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-
-  // Environment awareness: CalendarApp owns online/offline/focus detection
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
   useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); handlePullData(); };
-    const handleOffline = () => setIsOnline(false);
-    const handleFocus = () => handlePullData();
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('focus', handleFocus);
@@ -107,7 +114,7 @@ function CalendarApp() {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [handlePullData]);
+  }, [handleOnline, handleOffline, handleFocus]);
 
   // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(recordsStore.events, currentYear);
@@ -120,8 +127,8 @@ function CalendarApp() {
       });
   }, [currentYear]);
 
-  const handlePrevYear = () => setCurrentYear(y => y - 1);
-  const handleNextYear = () => setCurrentYear(y => y + 1);
+  const handlePrevYear = useCallback(() => setCurrentYear(y => y - 1), []);
+  const handleNextYear = useCallback(() => setCurrentYear(y => y + 1), []);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -147,13 +154,8 @@ function CalendarApp() {
     }
   }, [selectedDate, isEditMode]);
 
-  const onDayClick = (date: Date) => {
-    if (isEditMode) {
-      handleDayClick(date);
-    } else {
-      setSelectedDate(date);
-    }
-  };
+  const onEditClick = useCallback((date: Date) => handleDayClick(date), [handleDayClick]);
+  const onViewClick = useCallback((date: Date) => setSelectedDate(date), [setSelectedDate]);
 
   const selectedRecord = useMemo(() => {
     if (!selectedDate) return undefined;
@@ -190,21 +192,21 @@ function CalendarApp() {
         <main ref={scrollRef} className={`flex-1 overflow-y-auto no-scrollbar scroll-smooth relative bg-white md:bg-slate-50 ${selectedDate ? 'pb-[40vh] md:pb-0' : ''}`}>
 
 
-          <MobileCalendarView
+           <MobileCalendarView
               months={mobileMonths}
               events={recordsStore.events} // UI uses cleaned events
               predictedDates={predictedDates}
               predictedOvulationDates={predictedOvulationDates}
-              onDayClick={onDayClick}
+              onDayClick={isEditMode ? onEditClick : onViewClick}
               selectedDate={selectedDate}
           />
 
-          <DesktopCalendarView
+           <DesktopCalendarView
               months={desktopMonths}
               events={recordsStore.events} // UI uses cleaned events
               predictedDates={predictedDates}
               predictedOvulationDates={predictedOvulationDates}
-              onDayClick={onDayClick}
+              onDayClick={isEditMode ? onEditClick : onViewClick}
               selectedDate={selectedDate}
           />
         </main>
