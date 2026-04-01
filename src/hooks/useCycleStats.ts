@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { addMonths, endOfYear, max, startOfMonth } from 'date-fns';
-import type { DailyRecord } from '../types';
+import type { DailyRecord } from '../storage/DailyRecord';
 import { 
     calculateAverageCycleLength, 
     calculateAverageDuration, 
@@ -8,7 +8,7 @@ import {
     predictFutureOvulations
 } from '../services/statsService';
 
-export function useCycleStats(events: DailyRecord[], currentYear: number) {
+export function useCycleStats(events: readonly DailyRecord[], currentYear: number) {
   // 1. Calculate Averages
   const avgCycleLength = useMemo(() => calculateAverageCycleLength(events), [events]);
   const avgPeriodDuration = useMemo(() => calculateAverageDuration(events), [events]);

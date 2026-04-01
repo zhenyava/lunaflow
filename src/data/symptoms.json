@@ -20,6 +20,7 @@
       "name": "Physical",
       "color": "#d97706",
       "options": [
+        { "id": "sex", "label": "Sex" },
         { "id": "cramps", "label": "Cramps" },
         { "id": "tender_breasts", "label": "Tender Breasts" },
         { "id": "headache", "label": "Headache" },

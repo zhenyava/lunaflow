@@ -20,7 +20,7 @@ export interface SymptomCategory {
  */
 export interface DailyRecord {
   /** The date of the record in ISO YYYY-MM-DD format (e.g., "2024-03-24"). Acts as the Primary Key. */
-  date: string; 
+  date: string;
 
   /** 
    * Data related to menstrual flow for this day. 
@@ -56,35 +56,6 @@ export interface DailyRecord {
   isDeleted?: boolean;
 }
 
-/** 
- * Legacy format used in the initial version of the app.
- * Retained temporarily to support automatic data migration.
- */
-export interface LegacyCalendarEvent {
-  date: string;
-  type: EventType;
-}
-
-export interface UserProfile {
-  name: string;
-  email: string;
-  picture: string;
-}
-
-/** UI-only feedback type consumed by Header to display the sync icon. */
-export interface SyncIndicatorState {
-  status: 'idle' | 'syncing' | 'success' | 'error' | 'offline';
-  lastSynced?: Date;
-}
-
-export interface GoogleToken {
-  access_token: string;
-  expires_in: number;
-  scope: string;
-  token_type: string;
-  expires_at?: number; // Calculated expiration timestamp
-}
-
 /**
  * Helper to create a DailyRecord with period data.
  */
@@ -102,3 +73,48 @@ export const makeOvulationRecord = (date: string, updatedAt = Date.now()): Daily
   updatedAt,
   ovulation: {}
 });
+
+/**
+ * Determines if a record should be marked as deleted (tombstone).
+ * A record is deleted when it has no period, no ovulation, and no non-empty symptoms.
+ */
+export function computeIsDeleted(record: Partial<DailyRecord>): boolean {
+  const hasPeriod = !!record.period;
+  const hasOvulation = !!record.ovulation;
+  const hasSymptoms = !!record.symptoms && Object.keys(record.symptoms).length > 0;
+  return !hasPeriod && !hasOvulation && !hasSymptoms;
+}
+
+// --- Schema validation ---
+
+import * as v from 'valibot';
+
+const FlowIntensitySchema = v.picklist(['light', 'medium', 'heavy', 'spotting']);
+
+export const DailyRecordSchema = v.object({
+  date: v.pipe(v.string(), v.regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD date format')),
+  period: v.optional(v.object({ intensity: v.optional(FlowIntensitySchema) })),
+  ovulation: v.optional(
+    v.custom<Record<string, never>>((input) => typeof input === 'object' && input !== null && !Array.isArray(input))
+  ),
+  symptoms: v.optional(v.record(v.string(), v.array(v.string()))),
+  updatedAt: v.number(),
+  isDeleted: v.optional(v.boolean()),
+});
+
+/**
+ * Validates an array of unknown values, returning only the records that pass.
+ * Invalid records are dropped with a warning.
+ */
+export const validateDailyRecords = (data: unknown[]): DailyRecord[] => {
+  const valid: DailyRecord[] = [];
+  for (let i = 0; i < data.length; i++) {
+    const result = v.safeParse(DailyRecordSchema, data[i]);
+    if (result.success) {
+      valid.push(result.output);
+    } else {
+      console.warn(`[LunaFlow] Dropped invalid record at index ${i}:`, result.issues);
+    }
+  }
+  return valid;
+};

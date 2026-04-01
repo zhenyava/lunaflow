@@ -1,6 +1,6 @@
 import { format } from 'date-fns';
 import { X, Droplet, Sparkles, Trash2 } from 'lucide-react';
-import type { DailyRecord, FlowIntensity } from '../types';
+import type { DailyRecord, FlowIntensity } from '../storage/DailyRecord';
 import symptomsData from '../data/symptoms.json';
 
 interface DayDetailsPanelProps {

@@ -1,6 +1,8 @@
+import { useEffect, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Activity, RefreshCw, AlertCircle, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
-import type { SyncIndicatorState, EventType } from '../types';
+import { Activity, RefreshCw, Cloud, CloudOff, WifiOff, ChevronUp, Droplet, Sparkles, Edit3, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
+import type { EventType } from '../storage/DailyRecord';
+import type { RecordsStore } from '../storage/RecordsStore';
 import SettingsModal from './SettingsModal';
 interface HeaderProps {
     avgCycleLength: number | null;
@@ -8,7 +10,8 @@ interface HeaderProps {
     activeType: EventType;
     setActiveType: (type: EventType) => void;
     isAuthenticated: boolean;
-    syncState: SyncIndicatorState;
+    recordsStore: RecordsStore;
+    isOnline: boolean;
     onSync: () => void;
     onLogin: () => void;
 
@@ -58,7 +61,8 @@ export default function Header({
     activeType,
     setActiveType,
     isAuthenticated,
-    syncState,
+    recordsStore,
+    isOnline,
     onSync,
     onLogin,
     isSettingsOpen,
@@ -73,19 +77,23 @@ export default function Header({
     onNextYear
 }: HeaderProps) {
     const navigate = useNavigate();
+    const [, rerender] = useReducer((x: number) => x + 1, 0);
+    useEffect(() => recordsStore.subscribeCloudSyncStateChanged(rerender), [recordsStore]);
+    const syncState = isOnline ? recordsStore.cloudState : 'offline';
 
     const getSyncIcon = () => {
-        if (syncState.status === 'offline') {
+        if (syncState === 'offline') {
             return <WifiOff size={20} className="text-amber-500" />;
         }
-        if (syncState.status === 'syncing') {
+        if (syncState === 'uploading' || syncState === 'syncing') {
             return <RefreshCw size={20} className="animate-spin text-yellow-500" />;
         }
-        if (syncState.status === 'error') {
-            return <AlertCircle size={20} className="text-red-500" />;
-        }
-        if (isAuthenticated) {
+        if (syncState === 'synced') {
             return <Cloud size={20} className="text-green-500" />;
+        }
+        // 'unsynced': authenticated with pending upload, or not yet signed in
+        if (isAuthenticated) {
+            return <Cloud size={20} className="text-amber-400" />;
         }
         return <CloudOff size={20} className="text-gray-400" />;
     };
@@ -191,7 +199,7 @@ export default function Header({
                </div>
             </div>
     
-            <SettingsModal 
+            <SettingsModal
                 isOpen={isSettingsOpen}
                 onClose={() => setSettingsOpen(false)}
                 isAuthenticated={isAuthenticated}

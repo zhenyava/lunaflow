@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import { LAUNCHED_KEY } from '../constants';
-import { getStoredEvents } from '../services/storageService';
 
 const SmartRedirect = () => {
   const navigate = useNavigate();
@@ -14,21 +13,10 @@ const SmartRedirect = () => {
       return;
     }
 
-    const checkAndRedirect = async () => {
-      try {
-        const hasLaunched = localStorage.getItem(LAUNCHED_KEY);
-        const storedEvents = await getStoredEvents();
-
-        // If user has launched app before OR has data -> go to calendar
-        if (hasLaunched || storedEvents.length > 0) {
-          navigate('/calendar', { replace: true });
-        }
-      } catch (e) {
-        console.error('SmartRedirect storage error:', e);
-      }
-    };
-
-    checkAndRedirect();
+    const hasLaunched = localStorage.getItem(LAUNCHED_KEY);
+    if (hasLaunched) {
+      navigate('/calendar', { replace: true });
+    }
   }, [navigate, location.state]);
 
   return <LandingPage />;

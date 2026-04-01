@@ -44,4 +44,5 @@ jobs:
       - run: npm ci
       - run: npm run build
       - name: Verify PWA service worker
-        run: test -f dist/sw.js || (echo "ERROR: sw.js not found in build output — PWA service worker missing" && exit 1)
+        run: |
+          test -f dist/sw.js || (echo "ERROR: sw.js not found in build output - PWA service worker missing" && exit 1)

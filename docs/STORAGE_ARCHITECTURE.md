@@ -1,118 +1,164 @@
-# LunaFlow Storage Architecture & Migration
+# LunaFlow Storage Architecture
 
-This document outlines the approach used to store, version, and migrate data in LunaFlow.
+This document outlines the architecture used to store, sync, and version data in LunaFlow.
 
 ## Core Concepts
 
 1. **`DailyRecord`**: The single source of truth for a calendar day. All events (period, ovulation) are nested inside this single object.
-2. **Versioned Envelope**: Data is always stored locally and on Google Drive wrapped in an envelope containing a version number:
+2. **`StorageEnvelope`**: User data is wrapped in a versioned envelope for persistence and sync. This is the unit of storage managed by the `DataStore`.
    ```json
    {
-     "ver": 2,
+     "ver": 1,
      "records": [ { "date": "2024-01-01", ... } ]
    }
    ```
-3. **Transport Layer vs. Business Logic**:
-   - **Storage Providers** (in `src/storageProviders/`): Abstract implementations of the `RemoteStorageProvider` interface. They handle the specifics of each vendor's API (e.g., `googleService.ts` for Google Drive).
-   - `storageService.ts` handles **IndexedDB** (local storage), merging, and is the entry point for migration (`parseAndMigrateData`).
-   - `migrationService.ts` is a registry of transformation functions. It defines the `migrations` array.
+3. **Composition-Based Architecture**:
+   The system follows a "Composition over Inheritance" pattern. Infrastructure adapters handle raw data, while a central orchestrator manages domain logic, validation, and syncing.
+
+```
+CalendarApp.tsx  ← app shell: creates all instances, owns store lifecycle
+  ├── GoogleAuthProvider     ← see AUTH_ARCHITECTURE.md
+  └── RecordsStore           ← Domain Facade: manages business logic
+       └── DataStore<StorageEnvelope> ← Orchestrator: sync & persistence logic
+            ├── IndexedDBProvider     ← LocalStorageProvider (raw I/O)
+            ├── GoogleDriveProvider   ← CloudStorageProvider (raw I/O)
+            └── EnvelopeMigrationService ← DataMigrationService (domain logic)
+
+useCalendarEvents(store)  ← domain mutations only (via RecordsStore)
+```
+
+---
+
+## Lifecycle Contract
+
+Both `DataStore` and `RecordsStore` implement a **Strict Guard** pattern to ensure data integrity and prevent race conditions.
+
+### Mandatory Initialization
+Before calling any data-modifying methods (`save`, `upsertRecord`, `forceSync`, `connectCloud`, `disconnectCloud`), you **must** call and await `init()`. 
+
+- **Fail-Fast**: If a method is called before `init()`, an explicit `Error` is thrown.
+- **Idempotency**: Multiple calls to `init()` are safe; they return the same initialization promise.
+- **Async Safety**: Methods called while `init()` is still pending will automatically `await` its completion before proceeding. This prevents race conditions where mutations could overwrite data that is still being loaded from local storage.
+
+### Error Handling & Finality
+The `init()` process always reaches a terminal state:
+- **Success**: Data is loaded, validated, migrated, and subscribers are notified.
+- **Corruption/Missing**: If data is missing or validation fails, state is set to `null` and subscribers are notified that loading is finished.
+- **Failure**: If the local provider throws an error, it is caught, logged, and state is set to `null`.
+
+This ensures the UI never hangs in an infinite "loading" state.
+
+---
+
+## Component Responsibilities
+
+### Infrastructure Adapters (Raw I/O)
+
+These adapters are **type-agnostic**. They work with `unknown` data and do not know about `DailyRecord` or `StorageEnvelope`.
+
+#### `LocalStorageProvider` (`src/storage/LocalStorageProvider.ts`)
+Interface for local persistence.
+- `read(): Promise<unknown>`
+- `write(data: unknown): Promise<void>`
+
+**Implementation**: `IndexedDBProvider` (in `src/storage/indexedDBStorage.ts`) wraps functional IndexedDB calls.
+
+#### `CloudStorageProvider` (`src/cloudStorageProviders/`)
+Interface for cloud storage (e.g., Google Drive).
+- `checkFileExists(path: string): Promise<boolean>`
+- `downloadFile(path: string): Promise<unknown>`
+- `uploadFile(path: string, data: unknown): Promise<void>`
+
+---
+
+### Orchestration Layer
+
+#### `DataStore<T>` (`src/storage/DataStore.ts`)
+A concrete orchestrator class that manages the lifecycle of a specific data type `T`. It is injected with infrastructure providers and domain-specific functions.
+
+**Constructor Dependencies**:
+- `local: LocalStorageProvider`
+- `migrationService: DataMigrationService<T> | null`
+- `validator: (raw: unknown) => T | null`
+- `merger: (local: T, cloud: T) => T`
+- `isEqual: (a: T, b: T) => boolean`
+- `cloudPath: string`
+
+**Responsibilities**:
+- **Cache-first load**: `init()` reads local data, validates it, applies migrations, and updates state. If local storage is empty (`null`), `data` is set to `null` (fresh state).
+- **Save**: `save(data)` updates state, writes to local storage, and schedules a debounced cloud upload via `uploadFile`.
+- **Sync**: `pullDataFromCloud()` downloads from cloud via `downloadFile`, validates/migrates, merges with local state, and resolves conflicts. If the cloud file does not exist, `downloadFile` throws an error which is caught and logged.
+- **State management**: Tracks `cloudState` (`unsynced`, `uploading`, `synced`, `syncing`).
+
+**Guarantee after init()**: `data` is the in-memory RAM cache of the most recent data from all sources. `null` means no data exists anywhere (fresh state). This ensures `connectCloud()` only creates cloud files when real data exists.
+
+### Cloud Connection Logic
+
+`connectCloud()` behavior depends on the state of `data` and cloud file existence:
+
+1. **Cloud file exists** → `pullDataFromCloud()` downloads, merges, and saves data locally.
+2. **Cloud file does not exist**:
+   - `data !== null` → `scheduleUpload(data)` creates cloud file with existing RAM cache data.
+   - `data === null` → No action (no empty files created). Cloud file will be created on first `save()`.
+
+This prevents creating empty cloud files unnecessarily while ensuring existing data is synced.
+
+---
+
+### Domain Layer
+
+#### `DataMigrationService<T>` (`src/storage/migrationService.ts`)
+Abstract base class for versioned migrations.
+- `migrate(data: T): T` — loops through migration functions until `targetVersion` is reached.
+
+**Implementation**: `EnvelopeMigrationService` (in `src/storage/StorageEnvelope.ts`) manages migrations for the `StorageEnvelope`.
+
+#### `RecordsStore` (`src/storage/RecordsStore.ts`)
+The domain facade for `DailyRecord` data. It hides the complexity of `DataStore` and provides a clean API for the UI.
+- Owns the `DataStore<StorageEnvelope>` instance.
+- Provides derived views: `events` (filtered records) and `allRecords`.
+- Implements `async upsertRecord` and `async getRecord` logic with initialization guards.
+- **Sync Consistency**: Maintains an internal `_allRecordsInternal` cache that is updated *synchronously* during `upsertRecord`. This allows subsequent reads (even within the same microtask) to see the latest changes immediately, bypassing the inherent async delay of the underlying `DataStore.save()`.
+
+---
+
+## Sync Flows
+
+### 1. App start
+1. `RecordsStore.init()` called.
+2. `DataStore` reads raw data from `IndexedDBProvider`.
+3. `DataStore` validates raw data using `parseStorageEnvelope`.
+4. `DataStore` migrates data using `EnvelopeMigrationService` (applying `StorageEnvelope` migrations).
+5. UI is notified of data change.
+
+### 2. Full Sync
+Triggered by cloud connect, online status change, or window focus.
+1. `DataStore` fetches raw `unknown` from `CloudStorageProvider`.
+2. `DataStore` validates and migrates the fetched data.
+3. `DataStore` merges local and cloud data using the injected `merger` (last-write-wins per record).
+4. `DataStore` uses `isEqual` (fast comparison of record timestamps) to determine if local or cloud needs an update.
+
+---
+
+## Schema Validation
+
+Validation happens at the `DataStore` boundary using the injected `validator`. For records, this is `parseStorageEnvelope`, which uses **Valibot** for two-phase validation:
+1. Validate the envelope shape (`ver`, `records` array).
+2. Validate each record individually via `validateDailyRecords`.
+
+---
 
 ## Local Storage: IndexedDB
-
-LunaFlow uses **IndexedDB** (not localStorage) for local data persistence. IndexedDB provides:
-- Async API (non-blocking)
-- ~50MB+ storage limit vs localStorage's 5-10MB
-- Better eviction behavior in Safari PWA context
-
-### Database Layout
-
-- **Database**: `lunaflow` (version 1)
+- **Database**: `lunaflow`
 - **Object Store**: `appData`
 - **Key**: `events`
-- **Value**: versioned blob `{ ver: 2, records: DailyRecord[] }`
+- **Value**: `StorageEnvelope`
 
-### API
+---
 
-```typescript
-// Read records (async, runs migration pipeline)
-const records = await getStoredEvents();
-
-// Write records (async)
-await saveStoredEvents(records);
-```
-
-Both functions are in `src/services/storageService.ts` and are implemented using the native IndexedDB API — no external library.
-
-### Async Initialization in useCalendarEvents
-
-Since IndexedDB is async, `useCalendarEvents` starts with an empty array and loads records in a `useEffect`:
-
-```typescript
-const [records, setRecords] = useState<DailyRecord[]>([]);
-const isLoaded = useRef(false); // guards against saving empty state on mount
-
-useEffect(() => {
-  getStoredEvents().then(events => {
-    setRecords(events);
-    isLoaded.current = true;
-    setIsLoaded(true);
-  });
-}, []);
-```
-
-The `isLoaded` state (also returned from the hook) can be used to show a loading indicator while IndexedDB reads.
-
-**Note for developers**: If you clear the IndexedDB database (e.g., via Chrome DevTools > Application > IndexedDB), existing data will be lost. Re-sync from Google Drive if authenticated.
-
-## Storage Abstraction
-
-To support multiple storage vendors (e.g., Google Drive, Dropbox, OneDrive), LunaFlow uses a robust abstraction layer located in `src/storageProviders/`.
-
-1. **`RemoteStorageProvider` Interface**: A TypeScript interface that defines the required methods for any remote storage implementation (`id`, `name`, `initialize`, `signIn`, `signOut`, `fetchData`, `uploadData`, `restoreSession`, and an optional `handleCallback` for OAuth redirects).
-2. **`StorageProviderRegistry`**: A central registry that maps string IDs (e.g., `google-drive`) to their corresponding `RemoteStorageProvider` instances. This allows the application to dynamically resolve the active provider based on user settings.
-3. **`GoogleDriveProvider`**: The primary implementation of the `RemoteStorageProvider` interface, which wraps the `googleService.ts` transport layer.
-4. **`useRemoteSync` Hook**: This hook is entirely provider-agnostic. It accepts a `RemoteStorageProvider` instance (resolved from the registry in `CalendarApp.tsx`) and handles the high-level synchronization logic, such as:
-   - Conflict resolution (merging local and remote data).
-   - Auto-saving local changes to remote.
-   - Polling/Syncing on window focus.
-   - Session restoration.
-   - Triggering the provider's `handleCallback` method during initialization.
-
-This architecture allows for adding new storage providers without modifying the core synchronization logic or application structure. Simply create a new class implementing `RemoteStorageProviderInterface` and register it in the `StorageProviderRegistry`.
-
-## The Migration Pipeline
-
-The entry point for migration logic is `parseAndMigrateData(rawData)` in `src/services/storageService.ts`.
-
-It works sequentially based on an array of migration functions registered in `src/services/migrationService.ts`.
-
-```typescript
-const migrations: MigrationFunction[] = [
-  (data) => data, // Index 0 (unused)
-  migrateV1ToV2,  // Index 1: migrates FROM v1 TO v2
-];
-```
-
-The `parseAndMigrateData(rawData)` function:
-1. Detects the version of `rawData`. Legacy flat arrays are considered `ver: 1`.
-2. Extracts the records array from the envelope (if `ver > 1`).
-3. Uses a `while` loop to pass the **data array only** through every migration function starting from `currentVer` up to `STORAGE_CURRENT_VERSION`. 
-4. Returns a clean array of `DailyRecord[]` and a `wasMigrated` flag.
-
-**Key benefit:** Migration functions are pure data transformations. They don't need to know about the storage envelope or update the version number manually; the orchestrator handles that by incrementing the version after each successful function execution.
-
-## How to add a new version in the future
-
-If we need to change the schema again (e.g., to version 3):
-
-1. **Update Constants**: 
-   In `src/constants.ts`, bump `STORAGE_CURRENT_VERSION = 3`.
-2. **Write the Migration**:
-   In `src/services/migrationService.ts`, write a new function `migrateV2ToV3(records: DailyRecord[])`. It should accept the array of records and return the transformed array.
-   *If no structural changes are needed, you can use the `migrateVersionNumber` identity function.*
-3. **Register the Migration**:
-   Add the new function to the `migrations` array at index `2`.
-4. **Update Types**:
-   Update `DailyRecord` in `src/types.ts` to reflect the v3 changes.
-
-Because data fetched from both `localStorage` and Google Drive passes through `parseAndMigrateData`, the application will automatically update the data everywhere upon load and subsequent sync.
+## Adding a new data type
+1. Define the data interface and a Valibot schema.
+2. If versioning is needed, define a `StorageEnvelope` equivalent.
+3. Implement a `DataMigrationService` if necessary.
+4. Define migrations in a specific file (e.g., `src/storage/myTypeMigrations.ts`).
+5. Instantiate `DataStore<MyType>` with appropriate adapters and domain functions.

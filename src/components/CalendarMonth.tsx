@@ -2,11 +2,11 @@ import React from 'react';
 import { DayPicker } from 'react-day-picker';
 import { parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
-import type { DailyRecord } from '../types';
+import type { DailyRecord } from '../storage/DailyRecord';
 
 interface CalendarMonthProps {
   month: Date;
-  events?: DailyRecord[];
+  events?: readonly DailyRecord[];
   predictedDates?: Set<string>;
   predictedOvulationDates?: Set<string>;
   onDayClick?: (date: Date) => void;

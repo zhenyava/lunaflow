@@ -4,10 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 
+if (import.meta.env.DEV && import.meta.env.VITE_CLEAR_STORAGE === 'true') {
+  const { devClearStorage } = await import('./storage/devClearStorage');
+  await devClearStorage();
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <App />
     </BrowserRouter>
   </StrictMode>,
-)
+);
