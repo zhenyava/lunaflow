@@ -65,8 +65,9 @@ Interface for local persistence.
 
 #### `CloudStorageProvider` (`src/cloudStorageProviders/`)
 Interface for cloud storage (e.g., Google Drive).
-- `fetchData(path: string): Promise<unknown>`
-- `uploadData(path: string, data: unknown): Promise<void>`
+- `checkFileExists(path: string): Promise<boolean>`
+- `downloadFile(path: string): Promise<unknown>`
+- `uploadFile(path: string, data: unknown): Promise<void>`
 
 ---
 
@@ -84,10 +85,23 @@ A concrete orchestrator class that manages the lifecycle of a specific data type
 - `cloudPath: string`
 
 **Responsibilities**:
-- **Cache-first load**: `init()` reads local data, validates it, applies migrations, and updates state.
-- **Save**: `save(data)` updates state, writes to local storage, and schedules a debounced cloud upload.
-- **Sync**: `forceSync()` fetches from cloud, validates/migrates, merges with local state, and resolves conflicts.
+- **Cache-first load**: `init()` reads local data, validates it, applies migrations, and updates state. If local storage is empty (`null`), `data` is set to `null` (fresh state).
+- **Save**: `save(data)` updates state, writes to local storage, and schedules a debounced cloud upload via `uploadFile`.
+- **Sync**: `pullDataFromCloud()` downloads from cloud via `downloadFile`, validates/migrates, merges with local state, and resolves conflicts. If the cloud file does not exist, `downloadFile` throws an error which is caught and logged.
 - **State management**: Tracks `cloudState` (`unsynced`, `uploading`, `synced`, `syncing`).
+
+**Guarantee after init()**: `data` is the in-memory RAM cache of the most recent data from all sources. `null` means no data exists anywhere (fresh state). This ensures `connectCloud()` only creates cloud files when real data exists.
+
+### Cloud Connection Logic
+
+`connectCloud()` behavior depends on the state of `data` and cloud file existence:
+
+1. **Cloud file exists** → `pullDataFromCloud()` downloads, merges, and saves data locally.
+2. **Cloud file does not exist**:
+   - `data !== null` → `scheduleUpload(data)` creates cloud file with existing RAM cache data.
+   - `data === null` → No action (no empty files created). Cloud file will be created on first `save()`.
+
+This prevents creating empty cloud files unnecessarily while ensuring existing data is synced.
 
 ---
 

@@ -5,6 +5,11 @@ import type { DataMigrationService } from './DataMigrationService';
 export type CloudState = 'unsynced' | 'uploading' | 'synced' | 'syncing';
 
 export class DataStore<T> {
+  /**
+   * In-memory RAM cache of the most recent data from all sources (local + cloud).
+   * null = no data exists anywhere (fresh state).
+   * non-null = current working copy that the user interacts with.
+   */
   protected data: T | null = null;
   private _cloudStorageProvider: CloudStorageProvider | null = null;
   private _cloudState: CloudState = 'unsynced';
@@ -68,7 +73,6 @@ export class DataStore<T> {
   // --- Private setters ---
 
   private setData(data: T | null): void {
-    console.log("set data " + data);
     this.data = data;
     this._dataListeners.forEach(fn => fn());
   }
@@ -123,7 +127,7 @@ export class DataStore<T> {
     this.scheduleUpload(data);
   }
 
-  async forceSync(): Promise<void> {
+  async pullDataFromCloud(): Promise<void> {
     if (this._syncPromise) return this._syncPromise;
     this._syncPromise = (async () => {
       await this.ensureInitialized();
@@ -131,7 +135,7 @@ export class DataStore<T> {
       this.setCloudState('syncing');
 
       try {
-        const raw = await this._cloudStorageProvider.fetchData(this.cloudPath);
+        const raw = await this._cloudStorageProvider.downloadFile(this.cloudPath);
         let cloud = this._validator(raw);
         if (!cloud) {
           throw new Error('Invalid data from cloud');
@@ -163,7 +167,7 @@ export class DataStore<T> {
           this.setCloudState('synced');
         }
       } catch (e) {
-        console.error('[DataStore] forceSync failed', e);
+        console.error('[DataStore] pullDataFromCloud failed', e);
         this.setCloudState('unsynced');
       } finally {
         this._syncPromise = null;
@@ -179,12 +183,17 @@ export class DataStore<T> {
     this._connectPromise = (async () => {
       try {
         await this.ensureInitialized();
-        const ok = await provider.ensureFileExists(this.cloudPath);
-        if (!ok) {
-          throw new Error('[DataStore] Failed to ensure cloud file exists');
-        }
         this._cloudStorageProvider = provider;
-        await this.forceSync();
+        const exists = await provider.checkFileExists(this.cloudPath);
+        
+        if (!exists) {
+          if (this.data !== null) {
+            this.scheduleUpload(this.data);
+          }
+          // data === null → there is no data anywhere, don't create empty file in cloud for now
+        } else {
+          await this.pullDataFromCloud();
+        }
       } finally {
         this._connectPromise = null;
       }
@@ -225,7 +234,7 @@ export class DataStore<T> {
       if (!this._cloudStorageProvider) return;
       this.setCloudState('uploading');
       try {
-        await this._cloudStorageProvider.uploadData(this.cloudPath, data);
+        await this._cloudStorageProvider.uploadFile(this.cloudPath, data);
         this.setCloudState('synced');
       } catch {
         this.setCloudState('unsynced');

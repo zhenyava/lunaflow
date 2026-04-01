@@ -24,23 +24,23 @@ export interface CloudStorageProvider {
   readonly name: string;
 
   /**
-   * Ensures the cloud file exists, creating it if necessary.
+   * Checks if the cloud file exists.
    * @param path Slash-separated cloud path (e.g. "FolderName/file.json").
-   * @returns true on success, false on failure.
+   * @returns true if it exists, false otherwise.
    */
-  ensureFileExists(path: string): Promise<boolean>;
+  checkFileExists(path: string): Promise<boolean>;
 
   /**
-   * Fetches the data content from the cloud storage.
+   * Downloads the file content from the cloud storage.
    * @param path Slash-separated cloud path (e.g. "FolderName/file.json").
    * @returns The raw parsed data (usually a JSON object).
    */
-  fetchData(path: string): Promise<unknown>;
+  downloadFile(path: string): Promise<unknown>;
 
   /**
    * Uploads data to the cloud storage.
    * @param path Slash-separated cloud path (e.g. "FolderName/file.json").
    * @param data Serializable data to upload.
    */
-  uploadData(path: string, data: unknown): Promise<void>;
+  uploadFile(path: string, data: unknown): Promise<void>;
 }

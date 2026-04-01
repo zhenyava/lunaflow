@@ -15,7 +15,7 @@ describe('DataStore', () => {
   let validator: (raw: unknown) => TestData | null;
   let merger: (l: TestData, r: TestData) => TestData;
   let isEqual: (a: TestData, b: TestData) => boolean;
-  let store: DataStore<TestData>;
+   let store: DataStore<TestData>;
   let cloudProvider: CloudStorageProvider;
 
   beforeEach(() => {
@@ -47,9 +47,9 @@ describe('DataStore', () => {
     cloudProvider = {
       id: 'test-cloud',
       name: 'Test Cloud',
-      ensureFileExists: vi.fn(async () => true),
-      fetchData: vi.fn(async () => ({ val: 'cloud', v: 1 })),
-      uploadData: vi.fn(async () => { }),
+      checkFileExists: vi.fn(async () => true),
+      downloadFile: vi.fn(async () => ({ val: 'cloud', v: 1 })),
+      uploadFile: vi.fn(async () => { }),
     } as unknown as CloudStorageProvider;
   });
 
@@ -76,7 +76,7 @@ describe('DataStore', () => {
   describe('Strict Lifecycle: init mandatory', () => {
     const methods = [
       { name: 'save()', call: () => store.save({ val: 'new', v: 1 }) },
-      { name: 'forceSync()', call: () => store.forceSync() },
+      { name: 'pullDataFromCloud()', call: () => store.pullDataFromCloud() },
       { name: 'connectCloud()', call: () => store.connectCloud(cloudProvider) },
       { name: 'disconnectCloud()', call: () => store.disconnectCloud() },
     ];
@@ -152,6 +152,8 @@ describe('DataStore', () => {
     });
   });
 
+
+
   describe('save() logic', () => {
     beforeEach(async () => {
       await store.init();
@@ -167,18 +169,18 @@ describe('DataStore', () => {
       expect(localProvider.write).toHaveBeenCalledWith(newData);
 
       // Debounce check
-      expect(cloudProvider.uploadData).not.toHaveBeenCalled();
+      expect(cloudProvider.uploadFile).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(2000);
-      expect(cloudProvider.uploadData).toHaveBeenCalledWith('test/path.json', newData);
+      expect(cloudProvider.uploadFile).toHaveBeenCalledWith('test/path.json', newData);
     });
 
     it('transitions cloudState: unsynced -> uploading -> synced', async () => {
       await store.connectCloud(cloudProvider);
 
-      // Make uploadData hang so we can catch the 'uploading' state
+      // Make uploadFile hang so we can catch the 'uploading' state
       let resolveUpload: () => void;
       const uploadPromise = new Promise<void>((resolve) => { resolveUpload = resolve; });
-      vi.mocked(cloudProvider.uploadData).mockReturnValue(uploadPromise);
+      vi.mocked(cloudProvider.uploadFile).mockReturnValue(uploadPromise);
 
       await store.save({ val: 'new', v: 1 });
       expect(store.cloudState).toBe('unsynced');
@@ -195,13 +197,39 @@ describe('DataStore', () => {
 
       expect(store.cloudState).toBe('synced');
     });
-  });
+    });
 
-  describe('forceSync() logic', () => {
+    it('save() works with data === null (first user edit)', async () => {
+      // Create a fresh store with null local data
+      const freshLocalProvider = { 
+        read: vi.fn(async () => null), 
+        write: vi.fn(async () => {}) 
+      };
+      const freshStore = new DataStore<TestData>(
+        freshLocalProvider,
+        migrationService,
+        validator,
+        merger,
+        isEqual,
+        'test/path.json'
+      );
+      await freshStore.init();
+      expect(freshStore.currentData).toBeNull();
+
+      const newData = { val: 'first', v: 1 };
+      await freshStore.save(newData);
+
+      expect(freshStore.currentData).toEqual(newData);
+      expect(freshLocalProvider.write).toHaveBeenCalledWith(newData);
+      // Should schedule upload if cloud provider connected
+      // but we don't have cloud provider in this test
+    });
+
+  describe('pullDataFromCloud() logic', () => {
     beforeEach(async () => {
       await store.init();
       await store.connectCloud(cloudProvider);
-      vi.mocked(cloudProvider.uploadData).mockClear();
+      vi.mocked(cloudProvider.uploadFile).mockClear();
       vi.mocked(localProvider.write).mockClear();
     });
 
@@ -211,14 +239,14 @@ describe('DataStore', () => {
       const mergedData = { val: 'merged', v: 1 };
 
       (store as unknown as { data: TestData }).data = localData;
-      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(cloudProvider.downloadFile).mockResolvedValue(cloudData);
       vi.mocked(validator).mockReturnValue(cloudData);
       vi.mocked(merger).mockReturnValue(mergedData);
       vi.mocked(isEqual).mockImplementation((a, b) => a.val === b.val);
 
-      await store.forceSync();
+      await store.pullDataFromCloud();
 
-      expect(cloudProvider.fetchData).toHaveBeenCalledWith('test/path.json');
+      expect(cloudProvider.downloadFile).toHaveBeenCalledWith('test/path.json');
       expect(validator).toHaveBeenCalledWith(cloudData);
       expect(migrationService.migrate).toHaveBeenCalledWith(cloudData);
       expect(merger).toHaveBeenCalledWith(localData, cloudData);
@@ -227,12 +255,12 @@ describe('DataStore', () => {
       expect(localProvider.write).toHaveBeenCalledWith(mergedData);
       // Since merged != cloud, it should schedule upload
       await vi.advanceTimersByTimeAsync(2000);
-      expect(cloudProvider.uploadData).toHaveBeenCalledWith('test/path.json', mergedData);
+      expect(cloudProvider.uploadFile).toHaveBeenCalledWith('test/path.json', mergedData);
     });
 
     it('aborts and transitions to unsynced if cloud data is invalid', async () => {
       vi.mocked(validator).mockReturnValue(null);
-      await store.forceSync();
+      await store.pullDataFromCloud();
       expect(store.cloudState).toBe('unsynced');
       expect(localProvider.write).not.toHaveBeenCalled();
     });
@@ -240,11 +268,11 @@ describe('DataStore', () => {
     it('sets synced if merged data is already equal to both local and cloud', async () => {
       const sameData = { val: 'same', v: 1 };
       (store as unknown as { data: TestData }).data = sameData;
-      vi.mocked(cloudProvider.fetchData).mockResolvedValue(sameData);
+      vi.mocked(cloudProvider.downloadFile).mockResolvedValue(sameData);
       vi.mocked(validator).mockReturnValue(sameData);
       vi.mocked(isEqual).mockReturnValue(true);
 
-      await store.forceSync();
+      await store.pullDataFromCloud();
       expect(store.cloudState).toBe('synced');
       expect(localProvider.write).not.toHaveBeenCalled();
     });
@@ -252,25 +280,38 @@ describe('DataStore', () => {
     it('adopts cloud data immediately if local data is null', async () => {
       const cloudData = { val: 'cloud', v: 1 };
       (store as unknown as { data: TestData | null }).data = null;
-      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(cloudProvider.downloadFile).mockResolvedValue(cloudData);
       vi.mocked(validator).mockReturnValue(cloudData);
 
-      await store.forceSync();
+      await store.pullDataFromCloud();
 
       expect(store.currentData).toEqual(cloudData);
       expect(localProvider.write).toHaveBeenCalledWith(cloudData);
       expect(store.cloudState).toBe('synced');
     });
 
-    it('is idempotent: concurrent calls return the same promise', async () => {
-      vi.mocked(cloudProvider.fetchData).mockClear();
+    it('pullDataFromCloud() saves empty cloud envelope to local storage', async () => {
+      const emptyCloudData = { val: '', v: 0 };
+      (store as unknown as { data: TestData | null }).data = null;
+      vi.mocked(cloudProvider.downloadFile).mockResolvedValue(emptyCloudData);
+      vi.mocked(validator).mockReturnValue(emptyCloudData);
 
-      const p1 = store.forceSync();
-      const p2 = store.forceSync();
+      await store.pullDataFromCloud();
+
+      expect(store.currentData).toEqual(emptyCloudData);
+      expect(localProvider.write).toHaveBeenCalledWith(emptyCloudData);
+      expect(store.cloudState).toBe('synced');
+    });
+
+    it('is idempotent: concurrent calls return the same promise', async () => {
+      vi.mocked(cloudProvider.downloadFile).mockClear();
+
+      const p1 = store.pullDataFromCloud();
+      const p2 = store.pullDataFromCloud();
 
       await Promise.all([p1, p2]);
 
-      expect(cloudProvider.fetchData).toHaveBeenCalledTimes(1);
+      expect(cloudProvider.downloadFile).toHaveBeenCalledTimes(1);
     });
 
     it('updates local only if merged data matches cloud but differs from local', async () => {
@@ -278,7 +319,7 @@ describe('DataStore', () => {
       const cloudData = { val: 'new', v: 1 };
       
       (store as unknown as { data: TestData }).data = localData;
-      vi.mocked(cloudProvider.fetchData).mockResolvedValue(cloudData);
+      vi.mocked(cloudProvider.downloadFile).mockResolvedValue(cloudData);
       vi.mocked(validator).mockReturnValue(cloudData);
       // Merger returns cloudData (last write wins)
       vi.mocked(merger).mockReturnValue(cloudData);
@@ -286,11 +327,22 @@ describe('DataStore', () => {
       // isEqual(merged, cloud) -> true
       vi.mocked(isEqual).mockImplementation((a, b) => a.val === b.val);
 
-      await store.forceSync();
+      await store.pullDataFromCloud();
 
       expect(localProvider.write).toHaveBeenCalledWith(cloudData);
       expect(store.cloudState).toBe('synced');
-      expect(cloudProvider.uploadData).not.toHaveBeenCalled();
+      expect(cloudProvider.uploadFile).not.toHaveBeenCalled();
+    });
+
+    it('handles missing cloud file error', async () => {
+      vi.mocked(cloudProvider.downloadFile).mockRejectedValue(new Error('File not found'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      
+      await store.pullDataFromCloud();
+      
+      expect(console.error).toHaveBeenCalledWith('[DataStore] pullDataFromCloud failed', expect.any(Error));
+      expect(store.cloudState).toBe('unsynced');
+      expect(cloudProvider.downloadFile).toHaveBeenCalledWith('test/path.json');
     });
   });
 
@@ -299,17 +351,42 @@ describe('DataStore', () => {
       await store.init();
     });
 
-    it('ensures file exists and triggers immediate forceSync', async () => {
-      const forceSyncSpy = vi.spyOn(store, 'forceSync');
+    it('pull data if file exists', async () => {
+      vi.mocked(cloudProvider.checkFileExists).mockResolvedValue(true);
+      const pullSpy = vi.spyOn(store, 'pullDataFromCloud');
       await store.connectCloud(cloudProvider);
 
-      expect(cloudProvider.ensureFileExists).toHaveBeenCalledWith('test/path.json');
-      expect(forceSyncSpy).toHaveBeenCalled();
+      expect(cloudProvider.checkFileExists).toHaveBeenCalledWith('test/path.json');
+      expect(pullSpy).toHaveBeenCalled();
     });
 
-    it('fails if file cannot be ensured', async () => {
-      vi.mocked(cloudProvider.ensureFileExists).mockResolvedValue(false);
-      await expect(store.connectCloud(cloudProvider)).rejects.toThrow('Failed to ensure cloud file exists');
+    it('upload cached data if no cloud file', async () => {
+      vi.mocked(cloudProvider.checkFileExists).mockResolvedValue(false);
+      (store as unknown as { data: TestData }).data = { val: 'local', v: 1 };
+      const pullSpy = vi.spyOn(store, 'pullDataFromCloud');
+      
+      await store.connectCloud(cloudProvider);
+
+      expect(cloudProvider.checkFileExists).toHaveBeenCalledWith('test/path.json');
+      expect(pullSpy).not.toHaveBeenCalled();
+      
+      // Upload should be scheduled
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(cloudProvider.uploadFile).toHaveBeenCalledWith('test/path.json', { val: 'local', v: 1 });
+    });
+
+    it('does nothing when cloud file does not exist AND data is null', async () => {
+      vi.mocked(cloudProvider.checkFileExists).mockResolvedValue(false);
+      (store as unknown as { data: TestData | null }).data = null;
+      const pullSpy = vi.spyOn(store, 'pullDataFromCloud');
+      
+      await store.connectCloud(cloudProvider);
+
+      expect(cloudProvider.checkFileExists).toHaveBeenCalledWith('test/path.json');
+      expect(pullSpy).not.toHaveBeenCalled();
+      // No upload should be scheduled
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(cloudProvider.uploadFile).not.toHaveBeenCalled();
     });
 
     it('is idempotent: concurrent calls return the same promise', async () => {
@@ -318,8 +395,8 @@ describe('DataStore', () => {
 
       await Promise.all([p1, p2]);
 
-      expect(cloudProvider.ensureFileExists).toHaveBeenCalledTimes(1);
-      expect(cloudProvider.fetchData).toHaveBeenCalledTimes(1);
+      // checkFileExists is called once in connectCloud
+      expect(cloudProvider.checkFileExists).toHaveBeenCalledTimes(1);
     });
   });
 });

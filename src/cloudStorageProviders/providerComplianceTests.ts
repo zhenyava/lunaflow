@@ -17,9 +17,9 @@ export function runProviderComplianceTests(provider: CloudStorageProvider) {
     });
 
     it('should implement all required methods', () => {
-      expect(typeof provider.ensureFileExists).toBe('function');
-      expect(typeof provider.fetchData).toBe('function');
-      expect(typeof provider.uploadData).toBe('function');
+      expect(typeof provider.checkFileExists).toBe('function');
+      expect(typeof provider.downloadFile).toBe('function');
+      expect(typeof provider.uploadFile).toBe('function');
     });
   });
 }

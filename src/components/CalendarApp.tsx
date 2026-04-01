@@ -62,8 +62,8 @@ function CalendarApp() {
     await authProvider.signOut();
   }, [authProvider, recordsStore]);
 
-  const forceSync = useCallback(() => {
-    recordsStore.forceSync();
+  const handlePullData = useCallback(() => {
+    recordsStore.pullDataFromCloud();
   }, [recordsStore]);
 
   const handleProviderChange = useCallback((id: string) => {
@@ -96,9 +96,9 @@ function CalendarApp() {
   // Environment awareness: CalendarApp owns online/offline/focus detection
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   useEffect(() => {
-    const handleOnline = () => { setIsOnline(true); forceSync(); };
+    const handleOnline = () => { setIsOnline(true); handlePullData(); };
     const handleOffline = () => setIsOnline(false);
-    const handleFocus = () => forceSync();
+    const handleFocus = () => handlePullData();
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     window.addEventListener('focus', handleFocus);
@@ -107,7 +107,7 @@ function CalendarApp() {
       window.removeEventListener('offline', handleOffline);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [forceSync]);
+  }, [handlePullData]);
 
   // Statistics & Predictions use cleaned events
   const { avgCycleLength, avgPeriodDuration, predictedDates, predictedOvulationDates } = useCycleStats(recordsStore.events, currentYear);
@@ -171,7 +171,7 @@ function CalendarApp() {
         isAuthenticated={isAuthenticated}
         recordsStore={recordsStore}
         isOnline={isOnline}
-        onSync={() => isAuthenticated && forceSync()}
+        onSync={handlePullData}
         onLogin={handleLogin}
         isSettingsOpen={isSettingsOpen}
         setSettingsOpen={setSettingsOpen}

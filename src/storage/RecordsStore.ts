@@ -100,8 +100,8 @@ export class RecordsStore {
     await this._store.connectCloud(provider);
   }
 
-  async forceSync(): Promise<void> {
-    await this._store.forceSync();
+  async pullDataFromCloud(): Promise<void> {
+    await this._store.pullDataFromCloud();
   }
 
   async disconnectCloud(): Promise<void> {
